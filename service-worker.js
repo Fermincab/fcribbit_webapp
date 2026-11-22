@@ -1,13 +1,16 @@
-const CACHE_NAME = 'ribbit-cache-v1';
+const CACHE_NAME = 'ribbit-cache-v2';
+// Relative paths so the app works from a subpath (e.g. GitHub Pages).
 const urlsToCache = [
-    '/',
-    '/index.html',
-    '/styles.css',
-    '/script.js',
-    '/ribbiticon-32.png',
-    '/ribbiticon-64.png',
-    '/ribbiticon-128.png',
-    '/ribbiticon-256.png'
+    './',
+    './index.html',
+    './ribbit.wasm',
+    './ribbit.webmanifest',
+    './favicon.ico',
+    './ribbiticon-32.png',
+    './ribbiticon-64.png',
+    './ribbiticon-128.png',
+    './ribbiticon-256.png',
+    './ribbiticon-512.png'
 ];
 
 self.addEventListener('install', event => {
