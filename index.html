@@ -291,6 +291,95 @@
         }
     </script>
     <script type="text/javascript">
+        // EXPERIMENTAL message encryption.
+        // Encrypting messages on amateur radio frequencies is generally prohibited
+        // (ITU Radio Regulations Art. 25, FCC 97.113(a)(4), and national rules).
+        // Use only for experiments outside the amateur bands.
+        //
+        // Format of an encrypted message body: "ENC1:" + base64(salt | iv | ciphertext+tag)
+        // Key: PBKDF2-SHA256(password, salt) -> AES-256-GCM. The readable header
+        // (name|callsign|grid|phone) is authenticated as additional data, so an
+        // encrypted message can't be replayed under a different callsign.
+        window.RibbitCrypto = (() => {
+            const PREFIX = 'ENC1:';
+            const LOCK = '\u{1F512}';
+            const SALT_BYTES = 8;
+            const IV_BYTES = 12;
+            const TAG_BYTES = 16;
+            const ITERATIONS = 100000;
+            const OVERHEAD = SALT_BYTES + IV_BYTES + TAG_BYTES;
+            const textEncoder = new TextEncoder();
+
+            const toBase64 = bytes => {
+                let s = '';
+                bytes.forEach(b => { s += String.fromCharCode(b); });
+                return btoa(s);
+            };
+            const fromBase64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+
+            const available = () => !!(window.crypto && window.crypto.subtle);
+
+            const getSettings = () => {
+                const db = window.localStorage;
+                return {
+                    enabled: db ? db.getItem('encryptionEnabled') === 'true' : false,
+                    password: db ? (db.getItem('encryptionPassword') || '') : ''
+                };
+            };
+
+            const deriveKey = async (password, salt) => {
+                const base = await crypto.subtle.importKey('raw', textEncoder.encode(password), 'PBKDF2', false, ['deriveKey']);
+                return crypto.subtle.deriveKey(
+                    { name: 'PBKDF2', salt, iterations: ITERATIONS, hash: 'SHA-256' },
+                    base,
+                    { name: 'AES-GCM', length: 256 },
+                    false,
+                    ['encrypt', 'decrypt']
+                );
+            };
+
+            // how many plaintext bytes fit when `room` bytes are free in the payload
+            const maxPlaintextBytes = room => Math.floor((room - PREFIX.length) / 4) * 3 - OVERHEAD;
+
+            const isEncrypted = s => typeof s === 'string' && s.startsWith(PREFIX);
+
+            const encrypt = async (text, password, header) => {
+                const salt = crypto.getRandomValues(new Uint8Array(SALT_BYTES));
+                const iv = crypto.getRandomValues(new Uint8Array(IV_BYTES));
+                const key = await deriveKey(password, salt);
+                const ciphertext = new Uint8Array(await crypto.subtle.encrypt(
+                    { name: 'AES-GCM', iv, additionalData: textEncoder.encode(header) },
+                    key,
+                    textEncoder.encode(text)
+                ));
+                const packed = new Uint8Array(SALT_BYTES + IV_BYTES + ciphertext.length);
+                packed.set(salt, 0);
+                packed.set(iv, SALT_BYTES);
+                packed.set(ciphertext, SALT_BYTES + IV_BYTES);
+                return PREFIX + toBase64(packed);
+            };
+
+            const decrypt = async (body, password, header) => {
+                const packed = fromBase64(body.slice(PREFIX.length).trim());
+                if (packed.length < OVERHEAD) {
+                    throw new Error('encrypted message too short');
+                }
+                const salt = packed.slice(0, SALT_BYTES);
+                const iv = packed.slice(SALT_BYTES, SALT_BYTES + IV_BYTES);
+                const ciphertext = packed.slice(SALT_BYTES + IV_BYTES);
+                const key = await deriveKey(password, salt);
+                const plaintext = await crypto.subtle.decrypt(
+                    { name: 'AES-GCM', iv, additionalData: textEncoder.encode(header) },
+                    key,
+                    ciphertext
+                );
+                return new TextDecoder().decode(plaintext);
+            };
+
+            return { PREFIX, LOCK, available, getSettings, maxPlaintextBytes, isEncrypted, encrypt, decrypt };
+        })();
+    </script>
+    <script type="text/javascript">
         const UTF8ArrayToString = (heapOrArray, idx, maxBytesToRead) => {
             var endIdx = idx + maxBytesToRead;
             var endPtr = idx;
@@ -530,14 +619,15 @@
                 };
                 // button to trigger encoding
                 const encodebutton = document.getElementById("encodebutton");
-                const encodemessage = () => {
+                var encrypting = false;
+                const encodemessage = async () => {
                     // don't send a blank message.
                     if (messagebox.value.length < 1) {
                         console.log('no message to send');
                         return;
                     }
-                    // don't send a message while transmitting.
-                    if (!listen) { return; }
+                    // don't send a message while transmitting or encrypting.
+                    if (!listen || encrypting) { return; }
                     const db = window.localStorage;
                     if (!db) {
                         console.error('Local Storage is not available.');
@@ -548,7 +638,38 @@
                     const gridsquare = db.getItem('gridsquare');
                     const phone = db.getItem('phone');
                     const header = `${name}|${callsign}|${gridsquare}|${phone}`;
-                    const str = `${header}&=${messagebox.value}`;
+                    const plaintext = messagebox.value;
+                    let body = plaintext;
+                    // experimental encryption: only the message body is encrypted,
+                    // the header (name, callsign, grid, phone) stays readable.
+                    const encryption = RibbitCrypto.getSettings();
+                    if (encryption.enabled) {
+                        if (!RibbitCrypto.available()) {
+                            alert('Encryption needs a secure page (https:// or localhost).');
+                            return;
+                        }
+                        if (!encryption.password) {
+                            alert('Set an encryption password in Settings, or turn encryption off.');
+                            return;
+                        }
+                        const room = MESSAGE_LENGTH - new TextEncoder().encode(`${header}&=`).length;
+                        const maxBytes = RibbitCrypto.maxPlaintextBytes(room);
+                        if (new TextEncoder().encode(plaintext).length > maxBytes) {
+                            alert(`Encrypted messages can be at most ${Math.max(maxBytes, 0)} characters with your current name/callsign/grid/phone. Please shorten it.`);
+                            return;
+                        }
+                        encrypting = true;
+                        try {
+                            body = await RibbitCrypto.encrypt(plaintext, encryption.password, header);
+                        } catch (error) {
+                            console.error('encryption failed:', error);
+                            alert('Encryption failed, message not sent.');
+                            return;
+                        } finally {
+                            encrypting = false;
+                        }
+                    }
+                    const str = `${header}&=${body}`;
 
                     let encoding = new TextEncoder().encode(str);
                     console.log("encoded:", str);
@@ -556,8 +677,8 @@
                         detail: {
                             save: true,
                             type: 'text',
-                            sender: str.split('&=')[0],
-                            message: str.split('&=')[1],
+                            sender: header,
+                            message: encryption.enabled ? `${RibbitCrypto.LOCK} ${plaintext}` : plaintext,
                             timestamp: new Date().toUTCString()
                         }
                     });
@@ -653,6 +774,31 @@
                     console.log('decoded:', str);
                     const sender = str.split('&=')[0];
                     const message = str.split('&=')[1];
+                    // experimental encryption: decrypt if we have a password set.
+                    const body = message ? message.replace(/\0+$/, '') : '';
+                    if (sender && RibbitCrypto.isEncrypted(body)) {
+                        const showMessage = text => document.dispatchEvent(new CustomEvent('receivemessage', {
+                            detail: {
+                                save: true,
+                                type: 'text',
+                                sender: sender,
+                                message: text,
+                                timestamp: new Date().toUTCString()
+                            }
+                        }));
+                        const { password } = RibbitCrypto.getSettings();
+                        if (!password || !RibbitCrypto.available()) {
+                            showMessage(`${RibbitCrypto.LOCK} Encrypted message (set the password in Settings to read it)`);
+                            return;
+                        }
+                        RibbitCrypto.decrypt(body, password, sender)
+                            .then(text => showMessage(`${RibbitCrypto.LOCK} ${text}`))
+                            .catch(error => {
+                                console.warn('decryption failed:', error);
+                                showMessage(`${RibbitCrypto.LOCK} Encrypted message (wrong password or damaged)`);
+                            });
+                        return;
+                    }
                     if (sender && message) {
                         const event = new CustomEvent('receivemessage', {
                             detail: {
@@ -920,6 +1066,32 @@
             <input id="savemessages" checked type="checkbox">
         </div>
         <div class="setting">
+            <label for="encryptionenabled">Encrypt Messages:</label>
+            <input id="encryptionenabled" type="checkbox">
+        </div>
+        <div class="setting">
+            <label for="encryptionpassword">Encryption Password:</label>
+            <input id="encryptionpassword" type="password" autocomplete="off" placeholder="Shared password">
+        </div>
+        <div class="setting">
+            <p id="encryptionwarning">
+                &#9888; Experimental, for testing only. Encrypting messages on amateur radio frequencies is
+                generally prohibited. Everyone in the conversation needs the same password.
+                Incoming encrypted messages are decrypted whenever a password is set.
+            </p>
+            <style>
+                .setting>#encryptionwarning {
+                    height: auto;
+                    width: 100%;
+                    margin: 0;
+                    background: none;
+                    color: var(--light-green);
+                    font-size: 0.9rem;
+                    font-family: 'NotoSansDisplay-Italic';
+                }
+            </style>
+        </div>
+        <div class="setting">
             <label for="messagecount" style="width:25svw;">Messages:</label>
             <input id="messagecount" type="messagecount" style="width:25svw;" readonly value="0">
             <button id="clearmessages" style="width:25svw;" onclick="showClearMessageConfirm();">Clear Messages</button>
@@ -1171,6 +1343,8 @@
                 db.setItem('saveMessages', savemessages);
                 db.setItem('microphone', microphone);
                 db.setItem('speaker', speaker);
+                db.setItem('encryptionEnabled', document.getElementById('encryptionenabled').checked);
+                db.setItem('encryptionPassword', document.getElementById('encryptionpassword').value);
                 closeSettings();
             }
             document.addEventListener('openSettings', e => {
@@ -1199,6 +1373,8 @@
                 document.getElementById('phone').value = phone ? phone : '';
                 document.getElementById('microphone').value = microphone ? microphone : '';
                 document.getElementById('speaker').value = speaker ? speaker : '';
+                document.getElementById('encryptionenabled').checked = db.getItem('encryptionEnabled') === 'true';
+                document.getElementById('encryptionpassword').value = db.getItem('encryptionPassword') || '';
             });
             document.addEventListener('closeSettings', e => {
                 const settings = document.getElementById('settings');
