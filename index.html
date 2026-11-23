@@ -885,6 +885,14 @@
                     });
             });
         }
+        // ask the browser not to evict our data (settings, messages, offline copy) when storage runs low.
+        // iOS usually grants this to web apps added to the home screen.
+        if (navigator.storage && navigator.storage.persist) {
+            navigator.storage.persisted()
+                .then(persisted => persisted || navigator.storage.persist())
+                .then(persisted => console.log('Persistent storage:', persisted ? 'granted' : 'not granted'))
+                .catch(err => console.log('Persistent storage request failed:', err));
+        }
     </script>
 
 <body>

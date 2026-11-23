@@ -30,7 +30,8 @@ self.addEventListener('activate', event => {
     );
 });
 
-// network first, so updates show up right away; fall back to the cache when offline
+// network first, so updates show up right away; fall back to the cache when offline,
+// or when the server answers with an error (e.g. the site was taken down: 404)
 self.addEventListener('fetch', event => {
     if (event.request.method !== 'GET') {
         return;
@@ -38,9 +39,14 @@ self.addEventListener('fetch', event => {
     event.respondWith(
         fetch(event.request)
             .then(response => {
-                if (response.ok && new URL(event.request.url).origin === self.location.origin) {
+                const sameOrigin = new URL(event.request.url).origin === self.location.origin;
+                if (response.ok && sameOrigin) {
                     const copy = response.clone();
                     caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy));
+                    return response;
+                }
+                if (!response.ok && sameOrigin) {
+                    return caches.match(event.request).then(cached => cached || response);
                 }
                 return response;
             })
