@@ -161,6 +161,22 @@
             font-family: 'NotoSansDisplay-Italic';
         }
 
+        /* incoming messages are always light blue (overrides the per-callsign color) */
+        .message.rx>p,
+        .message.rx>.sender>.name {
+            background: #BFE3FF !important;
+        }
+
+        /* Settings > "Hide Names": hide the name tab above every message, keep the timestamp */
+        #chat.hidesenders .message>.sender>.name {
+            display: none;
+        }
+
+        /* keep the timestamp on its usual side (right for incoming, left for our own) */
+        #chat.hidesenders .message>.sender {
+            justify-content: flex-end;
+        }
+
         p {
             background: var(--light-green);
             padding: 0.25rem;
@@ -1075,6 +1091,10 @@
             <input id="savemessages" checked type="checkbox">
         </div>
         <div class="setting">
+            <label for="hidesenders">Hide Names:</label>
+            <input id="hidesenders" type="checkbox">
+        </div>
+        <div class="setting">
             <label for="encryptionenabled">Encrypt Messages:</label>
             <input id="encryptionenabled" type="checkbox">
         </div>
@@ -1354,8 +1374,19 @@
                 db.setItem('speaker', speaker);
                 db.setItem('encryptionEnabled', document.getElementById('encryptionenabled').checked);
                 db.setItem('encryptionPassword', document.getElementById('encryptionpassword').value);
+                db.setItem('hideSenders', document.getElementById('hidesenders').checked);
+                applyHideSenders();
                 closeSettings();
             }
+            // show or hide the name/time tab above every message
+            const applyHideSenders = () => {
+                const chat = document.getElementById('chat');
+                const db = window.localStorage;
+                if (chat && db) {
+                    chat.classList.toggle('hidesenders', db.getItem('hideSenders') === 'true');
+                }
+            };
+            document.addEventListener('DOMContentLoaded', applyHideSenders);
             document.addEventListener('openSettings', e => {
                 const settings = document.getElementById('settings');
                 settings.style.top = '0svh';
@@ -1384,6 +1415,7 @@
                 document.getElementById('speaker').value = speaker ? speaker : '';
                 document.getElementById('encryptionenabled').checked = db.getItem('encryptionEnabled') === 'true';
                 document.getElementById('encryptionpassword').value = db.getItem('encryptionPassword') || '';
+                document.getElementById('hidesenders').checked = db.getItem('hideSenders') === 'true';
             });
             document.addEventListener('closeSettings', e => {
                 const settings = document.getElementById('settings');
@@ -1532,8 +1564,16 @@
 
             // populate message element
 
-            if (name.length > 0 && callsign?.length > 0 && gridsquare.length > 0 && phone.length > 0) {
-                nameElement.innerText = `${name} [${callsign}] @${gridsquare} ${phone}`;
+            // show whatever sender fields were sent; only fall back to "unknown sender"
+            // when there is neither a name nor a callsign
+            const present = v => typeof v === 'string' && v.trim().length > 0 && v !== 'null' && v !== 'undefined';
+            if (present(name) || present(callsign)) {
+                nameElement.innerText = [
+                    present(name) ? name : '',
+                    present(callsign) ? `[${callsign}]` : '',
+                    present(gridsquare) ? `@${gridsquare}` : '',
+                    present(phone) ? phone : ''
+                ].filter(part => part.length > 0).join(' ');
                 const callsignToColor = cs => {
                     console.log('callsign:', cs);
                     const a = (cs.charCodeAt(0) * 11) + (cs.charCodeAt(1) * 7) + (cs.charCodeAt(2) * 3);
@@ -1541,7 +1581,7 @@
                     const color = `hsl(${h}, 50%, 80%)`;
                     return color;
                 }
-                if (callsign) {
+                if (present(callsign)) {
                     const color = callsignToColor(callsign);
                     console.log('setting color', color);
                     nameElement.style.background = color;
