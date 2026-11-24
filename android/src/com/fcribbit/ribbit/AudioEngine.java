@@ -54,8 +54,15 @@ public final class AudioEngine {
 		this.listener = listener;
 	}
 
+	/** a different source takes effect immediately (the microphone is reopened) */
 	public void setMicSource(int source) {
+		if (source == micSource)
+			return;
 		micSource = source;
+		if (running) {
+			DebugLog.log("mic source changed to " + source);
+			reopen();
+		}
 	}
 
 	public void setLevelWanted(boolean wanted) {
