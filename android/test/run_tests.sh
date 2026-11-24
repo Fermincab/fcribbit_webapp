@@ -46,4 +46,12 @@ node wasm_modem.mjs tx "$OUT/w.wav" "clave" "Hola desde la web 👍" >/dev/null
 $J rx "$OUT/w.wav" "clave" | grep -q "decrypt: Hola desde la web 👍" && echo "web -> android (encrypted) ok"
 node wasm_modem.mjs tx "$OUT/p.wav" "" "sin cifrar" >/dev/null
 $J rx "$OUT/p.wav" "" | grep -q "message: sin cifrar" && echo "web -> android (plain) ok"
+echo "== 4. wake tone detector"
+javac -nowarn -d "$OUT/classes" -cp "$OUT/classes" ../src/com/fcribbit/ribbit/WakeTone.java WakeToneTest.java
+java -Djava.library.path="$OUT/lib" -cp "$OUT/classes" WakeToneTest
+
+echo "== 5. session protocol: two simulated phones, half-duplex radio with VOX, sleep cycles, frame loss"
+javac -nowarn -d "$OUT/classes" -cp "$OUT/classes" ../src/com/fcribbit/ribbit/SessionLogic.java \
+	../src/com/fcribbit/ribbit/ChatMessage.java SessionSim.java
+java -cp "$OUT/classes" SessionSim
 echo "all tests passed"

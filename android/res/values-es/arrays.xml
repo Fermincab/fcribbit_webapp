@@ -4,4 +4,21 @@
         <item>Reconocimiento de voz (sin AGC)</item>
         <item>Micrófono</item>
     </string-array>
+
+    <string-array name="listen_mode_labels">
+        <item>Intermitente (ahorra batería)</item>
+        <item>Continua (con cargador)</item>
+        <item>Solo con la app abierta</item>
+    </string-array>
+    <string-array name="alarm_route_labels">
+        <item>A: altavoz + canal de llamada</item>
+        <item>B: A + modo en llamada</item>
+        <item>C: forzar multimedia al parlante (API oculta)</item>
+        <item>D: canal de timbre (parlante Y jack, referencia)</item>
+    </string-array>
+    <string-array name="alarm_delay_labels">
+        <item>Sin retardo</item>
+        <item>10 s (prueba)</item>
+        <item>30 s</item>
+    </string-array>
 </resources>

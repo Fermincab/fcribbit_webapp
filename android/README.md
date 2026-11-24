@@ -23,6 +23,48 @@ Port nativo de la web app de Ribbit para teléfonos con Android 2.3, pensado par
 > El cifrado sigue siendo experimental, igual que en la web app. Cifrar en bandas de
 > radioaficionados suele estar prohibido (UIT RR art. 25, FCC 97.113).
 
+## Escucha en segundo plano y sesiones
+
+Ribbit sigue escuchando con la app cerrada y la pantalla apagada (*Ajustes → Escucha en segundo plano*):
+
+- **Intermitente** (predeterminado): el teléfono duerme y cada 15 s se despierta 1 s a buscar el
+  **tono de aviso**, una secuencia bitono de 1000/1800 Hz.
+- **Continua**: siempre escuchando, para teléfonos conectados al cargador.
+- **Solo con la app abierta**: el comportamiento original.
+
+Las **sesiones** forman parte del envío normal:
+
+1. Si no hay sesión abierta, el primer mensaje sale precedido por el tono de aviso, que dura el
+   intervalo más 3 s (18 s con el intervalo de 15 s). Se repite, tono incluido, hasta que el otro
+   teléfono confirme, con un máximo de 3 intentos. Lo que escribas mientras tanto queda en cola.
+2. El teléfono que escuchó el tono se queda despierto, recibe el mensaje y confirma con
+   `CTL1:SESSION_OK`.
+3. Durante la sesión, los mensajes salen sin tono. Cada mensaje enviado o recibido extiende la
+   sesión 5 minutos, y 30 s antes del cierre aparece un aviso.
+4. Al vencer la sesión, el teléfono que la abrió manda `CTL1:SESSION_END` y los dos vuelven a dormir.
+   El próximo mensaje vuelve a mandar el tono.
+
+Los mensajes recibidos en segundo plano generan una notificación **solo con vibración y LED**,
+sin sonido: un sonido saldría por el jack y activaría el VOX de la radio.
+
+## Alarma
+
+El botón **Alarma** manda `CTL1:ALARM`. El teléfono que la recibe abre una pantalla completa y,
+pasado el retardo configurable (10 s por defecto, para que alcances a conectar los auriculares
+durante la prueba), hace sonar el tono de llamada hasta que toques la pantalla o cualquier tecla.
+La idea es que suene **solo por el parlante del teléfono**. Android 2.3 no tiene una forma
+oficial de hacerlo, así que hay cuatro métodos para probar en *Ajustes → Salida del sonido de alarma*:
+
+| | Método | Qué hace |
+|---|---|---|
+| A | Altavoz + canal de llamada | `setSpeakerphoneOn(true)` y reproducción en `STREAM_VOICE_CALL` |
+| B | A + modo en llamada | Lo mismo, con `MODE_IN_CALL`; algunos equipos solo cambian la ruta en ese modo |
+| C | Forzar multimedia | Método oculto `AudioSystem.setForceUse(FOR_MEDIA, FORCE_SPEAKER)` |
+| D | Canal de timbre | Comportamiento normal de Android: parlante **y** jack. Sirve como referencia |
+
+La pantalla de la alarma muestra qué método se usó y si el sistema aceptó cada ajuste.
+*Probar la alarma en este teléfono* la hace sonar localmente, sin usar la radio.
+
 ## Instalar
 
 1. En el teléfono: *Ajustes → Aplicaciones → Orígenes desconocidos*.
@@ -70,3 +112,7 @@ test/run_tests.sh
 3. El código Java de la app (`Payload`, `RibbitCrypto`, `Modem` sobre una compilación JNI para el
    host) contra el `ribbit.wasm` compilado de la web app, por audio, en las dos direcciones y con
    mensajes cifrados y sin cifrar.
+4. El detector del tono de aviso: con ruido, con nivel bajo y saturado, y sin falsas detecciones
+   con ruido, tonos fijos (incluido el de 1750 Hz), voz simulada ni tramas Ribbit.
+5. El protocolo de sesiones con dos teléfonos simulados en un canal semidúplex con VOX, ciclos de
+   sueño de fase aleatoria, pérdidas de tramas, colisiones y un teléfono apagado.

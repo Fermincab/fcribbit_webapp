@@ -2,14 +2,15 @@ package com.fcribbit.ribbit;
 
 import android.app.Activity;
 import android.app.AlertDialog;
-import android.content.Context;
+import android.content.ComponentName;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.ServiceConnection;
 import android.content.SharedPreferences;
 import android.media.AudioManager;
 import android.os.Bundle;
 import android.os.Handler;
-import android.os.PowerManager;
+import android.os.IBinder;
 import android.preference.PreferenceManager;
 import android.text.Editable;
 import android.text.TextWatcher;
@@ -29,30 +30,45 @@ import android.widget.Toast;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-public class MainActivity extends Activity implements AudioEngine.Listener {
+public class MainActivity extends Activity implements RibbitService.UiListener {
 	private static final int MENU_SETTINGS = 1;
 	private static final int MENU_CLEAR = 2;
 
 	private final Handler handler = new Handler();
-	/** PBKDF2 runs here so neither the UI nor the audio threads stall */
+	/** PBKDF2 runs here so the UI doesn't stall */
 	private final ExecutorService crypto = Executors.newSingleThreadExecutor();
 
 	private SharedPreferences prefs;
-	private MessageStore store;
 	private MessageAdapter adapter;
-	private AudioEngine engine;
-	private PowerManager.WakeLock wakeLock;
+	private RibbitService service;
+	private boolean resumed;
 
 	private ListView chat;
 	private EditText input;
-	private Button send;
+	private Button send, alarm;
 	private TextView status;
 	private TextView counter;
 	private ProgressBar level;
 
-	private boolean modemOk;
 	private boolean encrypting;
 	private boolean askedForSettings;
+	private int shownCount = -1;
+
+	private final ServiceConnection connection = new ServiceConnection() {
+		public void onServiceConnected(ComponentName name, IBinder binder) {
+			service = ((RibbitService.LocalBinder) binder).service();
+			if (!service.modemOk()) {
+				new AlertDialog.Builder(MainActivity.this).setMessage(R.string.native_error)
+						.setPositiveButton(android.R.string.ok, null).show();
+			}
+			service.setUi(MainActivity.this, resumed);
+			onChanged();
+		}
+
+		public void onServiceDisconnected(ComponentName name) {
+			service = null;
+		}
+	};
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -61,16 +77,12 @@ public class MainActivity extends Activity implements AudioEngine.Listener {
 		setVolumeControlStream(AudioManager.STREAM_MUSIC);
 		PreferenceManager.setDefaultValues(this, R.xml.settings, false);
 		prefs = PreferenceManager.getDefaultSharedPreferences(this);
-		store = new MessageStore(this);
 		adapter = new MessageAdapter(this);
-		engine = new AudioEngine(this);
-		PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
-		wakeLock = pm.newWakeLock(PowerManager.SCREEN_DIM_WAKE_LOCK, "ribbit");
-		wakeLock.setReferenceCounted(false);
 
 		chat = (ListView) findViewById(R.id.chat);
 		input = (EditText) findViewById(R.id.message);
 		send = (Button) findViewById(R.id.send);
+		alarm = (Button) findViewById(R.id.alarm);
 		status = (TextView) findViewById(R.id.status);
 		counter = (TextView) findViewById(R.id.counter);
 		level = (ProgressBar) findViewById(R.id.level);
@@ -79,6 +91,11 @@ public class MainActivity extends Activity implements AudioEngine.Listener {
 		send.setOnClickListener(new View.OnClickListener() {
 			public void onClick(View v) {
 				sendMessage();
+			}
+		});
+		alarm.setOnClickListener(new View.OnClickListener() {
+			public void onClick(View v) {
+				confirmAlarm();
 			}
 		});
 		((ImageButton) findViewById(R.id.settings_button)).setOnClickListener(new View.OnClickListener() {
@@ -110,27 +127,20 @@ public class MainActivity extends Activity implements AudioEngine.Listener {
 			}
 		});
 
-		modemOk = Modem.load();
-		if (!modemOk) {
-			send.setEnabled(false);
-			new AlertDialog.Builder(this).setMessage(R.string.native_error)
-					.setPositiveButton(android.R.string.ok, null).show();
-		}
-		if (prefs.getBoolean("saveMessages", true))
-			adapter.setAll(store.loadRecent());
+		Intent svc = new Intent(this, RibbitService.class).setAction(RibbitService.ACTION_START);
+		startService(svc);
+		bindService(svc, connection, BIND_AUTO_CREATE);
 	}
 
 	@Override
 	protected void onResume() {
 		super.onResume();
+		resumed = true;
 		adapter.setHideSenders(prefs.getBoolean("hideSenders", false));
 		updateCounter();
-		if (modemOk) {
-			engine.setMicSource(parseInt(prefs.getString("micSource", "6"), 6));
-			engine.start();
-			wakeLock.acquire();
-			showListening();
-		}
+		if (service != null)
+			service.setUi(this, true);
+		handler.post(clock);
 		// like the web app: open the settings when the station isn't set up yet
 		if (!askedForSettings && prefs.getString("name", "").length() == 0) {
 			askedForSettings = true;
@@ -141,9 +151,10 @@ public class MainActivity extends Activity implements AudioEngine.Listener {
 	@Override
 	protected void onPause() {
 		super.onPause();
-		engine.stop();
-		if (wakeLock.isHeld())
-			wakeLock.release();
+		resumed = false;
+		handler.removeCallbacks(clock);
+		if (service != null)
+			service.setUi(this, false);
 		level.setProgress(0);
 	}
 
@@ -151,8 +162,18 @@ public class MainActivity extends Activity implements AudioEngine.Listener {
 	protected void onDestroy() {
 		super.onDestroy();
 		crypto.shutdown();
-		store.close();
+		if (service != null)
+			service.setUi(null, false);
+		unbindService(connection);
 	}
+
+	/** refreshes the status line (session countdown) */
+	private final Runnable clock = new Runnable() {
+		public void run() {
+			updateStatus();
+			handler.postDelayed(this, 1000);
+		}
+	};
 
 	// ------------------------------------------------------------------ menu
 
@@ -173,10 +194,8 @@ public class MainActivity extends Activity implements AudioEngine.Listener {
 				new AlertDialog.Builder(this).setMessage(R.string.clear_messages_confirm)
 						.setPositiveButton(R.string.yes, new DialogInterface.OnClickListener() {
 							public void onClick(DialogInterface d, int w) {
-								store.clear();
-								adapter.clear();
-								addMessage(new ChatMessage(System.currentTimeMillis(), ChatMessage.ALERT, "",
-										getString(R.string.messages_cleared), false), false);
+								if (service != null)
+									service.clearMessages();
 							}
 						}).setNegativeButton(R.string.no, null).show();
 				return true;
@@ -188,7 +207,7 @@ public class MainActivity extends Activity implements AudioEngine.Listener {
 		startActivity(new Intent(this, SettingsActivity.class));
 	}
 
-	// ------------------------------------------------------------- transmit
+	// ------------------------------------------------------------- sending
 
 	private String header() {
 		return Payload.header(prefs.getString("name", ""), prefs.getString("callsign", ""),
@@ -203,162 +222,128 @@ public class MainActivity extends Activity implements AudioEngine.Listener {
 		String text = input.getText().toString();
 		int room = Payload.room(header());
 		int used = Payload.utf8(text).length;
-		if (encryptionOn()) {
-			int max = Math.max(RibbitCrypto.maxPlaintextBytes(room), 0);
-			counter.setText(getString(R.string.enc_bytes_left, max - used));
-		} else {
-			counter.setText(getString(R.string.bytes_left, room - used));
-		}
-		counter.setTextColor(used > (encryptionOn() ? RibbitCrypto.maxPlaintextBytes(room) : room)
-				? 0xFFFF6060 : 0xFF9AA59A);
+		int max = encryptionOn() ? Math.max(RibbitCrypto.maxPlaintextBytes(room), 0) : room;
+		counter.setText(getString(encryptionOn() ? R.string.enc_bytes_left : R.string.bytes_left, max - used));
+		counter.setTextColor(used > max ? 0xFFFF6060 : 0xFF9AA59A);
+	}
+
+	private boolean ready() {
+		return service != null && service.modemOk() && !encrypting;
 	}
 
 	private void sendMessage() {
-		if (!modemOk)
+		if (!ready())
 			return;
 		final String plaintext = input.getText().toString();
 		if (plaintext.length() < 1)
-			return;
-		// don't send while transmitting or encrypting
-		if (engine.isTransmitting() || encrypting)
 			return;
 		final String header = header();
 		int room = Payload.room(header);
 		if (!encryptionOn()) {
 			if (Payload.utf8(plaintext).length > room) {
-				toast(getString(R.string.too_long, Math.max(room, 0)));
+				onToast(getString(R.string.too_long, Math.max(room, 0)));
 				return;
 			}
-			transmit(header, plaintext, plaintext, false);
+			input.setText("");
+			service.sendText(header, plaintext, plaintext, false);
 			return;
 		}
 		final String password = prefs.getString("encryptionPassword", "");
 		if (password.length() == 0) {
-			toast(getString(R.string.set_password));
+			onToast(getString(R.string.set_password));
 			return;
 		}
 		int maxBytes = RibbitCrypto.maxPlaintextBytes(room);
 		if (Payload.utf8(plaintext).length > maxBytes) {
-			toast(getString(R.string.enc_too_long, Math.max(maxBytes, 0)));
+			onToast(getString(R.string.enc_too_long, Math.max(maxBytes, 0)));
 			return;
 		}
 		encrypting = true;
-		status.setText(R.string.encrypting);
-		send.setEnabled(false);
+		updateStatus();
 		crypto.execute(new Runnable() {
 			public void run() {
 				final String body = RibbitCrypto.encrypt(plaintext, password, header);
 				handler.post(new Runnable() {
 					public void run() {
 						encrypting = false;
-						send.setEnabled(true);
 						if (body == null) {
-							toast(getString(R.string.encryption_failed));
-							showListening();
-							return;
+							onToast(getString(R.string.encryption_failed));
+						} else if (service != null) {
+							input.setText("");
+							service.sendText(header, body, plaintext, true);
 						}
-						transmit(header, body, plaintext, true);
+						updateStatus();
 					}
 				});
 			}
 		});
 	}
 
-	private void transmit(String header, String body, String shown, boolean encrypted) {
-		float gain = parseFloat(prefs.getString("txLevel", "0.75"), 0.75f);
-		if (!engine.transmit(Payload.pack(header, body), gain))
+	private void confirmAlarm() {
+		if (!ready())
 			return;
-		status.setText(R.string.transmitting);
-		send.setEnabled(false);
-		input.setText("");
-		addMessage(new ChatMessage(System.currentTimeMillis(), ChatMessage.OUT, header, shown, encrypted), true);
+		new AlertDialog.Builder(this).setMessage(R.string.alarm_confirm)
+				.setPositiveButton(R.string.yes, new DialogInterface.OnClickListener() {
+					public void onClick(DialogInterface d, int w) {
+						if (service != null)
+							service.sendAlarm();
+					}
+				}).setNegativeButton(R.string.no, null).show();
 	}
 
-	// --------------------------------------------------------- AudioEngine
+	// ------------------------------------------------------------ service
 
-	public void onTxDone() {
-		send.setEnabled(modemOk && !encrypting);
-		showListening();
+	public void onChanged() {
+		if (service == null)
+			return;
+		int count = service.messages().size();
+		if (count != shownCount) {
+			shownCount = count;
+			adapter.setAll(service.messages());
+			chat.setSelection(adapter.getCount() - 1);
+		}
+		updateStatus();
 	}
 
 	public void onLevel(int percent) {
-		level.setProgress(engine.isTransmitting() ? 0 : percent);
+		level.setProgress(percent);
 	}
 
-	public void onRxError() {
-		status.setText(R.string.mic_error);
+	public void onToast(String text) {
+		Toast.makeText(this, text, Toast.LENGTH_LONG).show();
 	}
 
-	public void onPayload(byte[] payload, int result) {
-		if (result < 0) {
-			// the web app shows these as garbage; just note them in the status line
-			status.setText(R.string.bad_frame);
-			handler.postDelayed(new Runnable() {
-				public void run() {
-					if (!engine.isTransmitting() && !encrypting)
-						showListening();
-				}
-			}, 3000);
+	private void updateStatus() {
+		if (service == null)
 			return;
-		}
-		final Payload.Parsed p = Payload.parse(payload);
-		final long now = System.currentTimeMillis();
-		if (p.sender.length() > 0 && RibbitCrypto.isEncrypted(p.message)) {
-			final String password = prefs.getString("encryptionPassword", "");
-			if (password.length() == 0) {
-				addMessage(new ChatMessage(now, ChatMessage.IN, p.sender, getString(R.string.enc_no_password), true), true);
-				return;
+		SessionLogic s = service.session();
+		String text;
+		if (!service.modemOk())
+			text = getString(R.string.native_error_short);
+		else if (encrypting)
+			text = getString(R.string.encrypting);
+		else if (s.transmittingTone())
+			text = getString(R.string.status_calling);
+		else if (service.transmitting() || s.transmitting())
+			text = getString(R.string.transmitting);
+		else {
+			switch (s.state()) {
+				case OPENING:
+					text = getString(R.string.status_waiting_ack, s.attempts(), SessionLogic.MAX_ATTEMPTS);
+					break;
+				case WOKEN:
+					text = getString(R.string.status_woken);
+					break;
+				case SESSION:
+					long sec = s.remainingMs() / 1000;
+					text = getString(R.string.status_session, String.format("%d:%02d", sec / 60, sec % 60));
+					break;
+				default:
+					text = getString(R.string.status_no_session);
 			}
-			crypto.execute(new Runnable() {
-				public void run() {
-					final String text = RibbitCrypto.decrypt(p.message, password, p.sender);
-					handler.post(new Runnable() {
-						public void run() {
-							addMessage(new ChatMessage(now, ChatMessage.IN, p.sender,
-									text != null ? text : getString(R.string.enc_wrong_password), true), true);
-						}
-					});
-				}
-			});
-			return;
 		}
-		if (p.sender.length() > 0 && p.message != null && p.message.length() > 0)
-			addMessage(new ChatMessage(now, ChatMessage.IN, p.sender, p.message, false), true);
-		else
-			addMessage(new ChatMessage(now, ChatMessage.IN, getString(R.string.unknown), p.text, false), true);
-	}
-
-	// ---------------------------------------------------------------- misc
-
-	private void addMessage(ChatMessage m, boolean save) {
-		if (save && prefs.getBoolean("saveMessages", true))
-			store.add(m);
-		adapter.add(m);
-		chat.setSelection(adapter.getCount() - 1);
-	}
-
-	private void showListening() {
-		if (!engine.isTransmitting() && !encrypting)
-			status.setText(getString(R.string.listening) + (Modem.variant().equals("soft") ? " (soft-float)" : ""));
-	}
-
-	private void toast(String s) {
-		Toast.makeText(this, s, Toast.LENGTH_LONG).show();
-	}
-
-	private static int parseInt(String s, int def) {
-		try {
-			return Integer.parseInt(s);
-		} catch (Exception e) {
-			return def;
-		}
-	}
-
-	private static float parseFloat(String s, float def) {
-		try {
-			return Float.parseFloat(s);
-		} catch (Exception e) {
-			return def;
-		}
+		if (Modem.variant().equals("soft"))
+			text += " (soft-float)";
+		status.setText(text);
 	}
 }

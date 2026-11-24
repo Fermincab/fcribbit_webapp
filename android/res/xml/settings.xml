@@ -42,6 +42,49 @@
             android:defaultValue="false" />
     </PreferenceCategory>
 
+    <PreferenceCategory android:title="@string/cat_listen">
+        <ListPreference
+            android:key="listenMode"
+            android:title="@string/listen_mode"
+            android:entries="@array/listen_mode_labels"
+            android:entryValues="@array/listen_mode_values"
+            android:defaultValue="intermittent" />
+        <ListPreference
+            android:key="checkInterval"
+            android:title="@string/check_interval"
+            android:entries="@array/interval_labels"
+            android:entryValues="@array/interval_values"
+            android:defaultValue="15" />
+        <ListPreference
+            android:key="sessionMinutes"
+            android:title="@string/session_minutes"
+            android:entries="@array/session_labels"
+            android:entryValues="@array/session_values"
+            android:defaultValue="5" />
+        <Preference
+            android:key="battery"
+            android:title="@string/battery" />
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/cat_alarm">
+        <ListPreference
+            android:key="alarmRoute"
+            android:title="@string/alarm_route"
+            android:entries="@array/alarm_route_labels"
+            android:entryValues="@array/alarm_route_values"
+            android:defaultValue="speakerphone" />
+        <ListPreference
+            android:key="alarmDelay"
+            android:title="@string/alarm_delay"
+            android:entries="@array/alarm_delay_labels"
+            android:entryValues="@array/alarm_delay_values"
+            android:defaultValue="10" />
+        <Preference
+            android:key="alarmTest"
+            android:title="@string/alarm_test"
+            android:summary="@string/alarm_test_summary" />
+    </PreferenceCategory>
+
     <PreferenceCategory android:title="@string/cat_audio">
         <ListPreference
             android:key="txLevel"

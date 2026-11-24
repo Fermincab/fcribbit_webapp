@@ -3,6 +3,7 @@ package com.fcribbit.ribbit;
 import android.app.ProgressDialog;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.location.Location;
 import android.location.LocationListener;
@@ -33,11 +34,35 @@ public class SettingsActivity extends PreferenceActivity implements SharedPrefer
 				return true;
 			}
 		});
+		findPreference("alarmTest").setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
+			public boolean onPreferenceClick(Preference p) {
+				startActivity(new Intent(SettingsActivity.this, AlarmActivity.class)
+						.putExtra(AlarmActivity.EXTRA_LOCAL_TEST, true));
+				return true;
+			}
+		});
 		for (String k : TEXT_KEYS)
 			updateSummary(k);
+		for (String k : LIST_KEYS)
+			updateSummary(k);
 		updateSummary("encryptionPassword");
-		updateSummary("txLevel");
-		updateSummary("micSource");
+		updateBattery();
+	}
+
+	private static final String[] LIST_KEYS = { "txLevel", "micSource", "listenMode", "checkInterval",
+			"sessionMinutes", "alarmRoute", "alarmDelay" };
+
+	private void updateBattery() {
+		SharedPreferences prefs = getPreferenceScreen().getSharedPreferences();
+		Preference p = findPreference("battery");
+		long t0 = prefs.getLong("battStartTime", 0), t1 = prefs.getLong("battLastTime", 0);
+		int l0 = prefs.getInt("battStartLevel", -1), l1 = prefs.getInt("battLastLevel", -1);
+		double hours = (t1 - t0) / 3600000.0;
+		if (t0 == 0 || l0 < 0 || hours < 0.25) {
+			p.setSummary(R.string.battery_none);
+			return;
+		}
+		p.setSummary(getString(R.string.battery_summary, (l0 - l1) / hours, hours, l1));
 	}
 
 	@Override
@@ -55,10 +80,15 @@ public class SettingsActivity extends PreferenceActivity implements SharedPrefer
 
 	public void onSharedPreferenceChanged(SharedPreferences prefs, String key) {
 		updateSummary(key);
+		// the background service picks up the listening mode / interval
+		if (key.equals("listenMode") || key.equals("checkInterval"))
+			startService(new Intent(this, RibbitService.class).setAction(RibbitService.ACTION_START));
 	}
 
 	private void updateSummary(String key) {
 		Preference p = findPreference(key);
+		if (p == null)
+			return;
 		if (p instanceof EditTextPreference) {
 			String v = ((EditTextPreference) p).getText();
 			boolean empty = v == null || v.length() == 0;

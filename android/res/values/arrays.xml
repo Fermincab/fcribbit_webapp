@@ -27,4 +27,59 @@
         <item>6</item>
         <item>1</item>
     </string-array>
+
+    <string-array name="listen_mode_labels">
+        <item>Intermittent (saves battery)</item>
+        <item>Continuous (on a charger)</item>
+        <item>Only with the app open</item>
+    </string-array>
+    <string-array name="listen_mode_values">
+        <item>intermittent</item>
+        <item>continuous</item>
+        <item>foreground</item>
+    </string-array>
+    <string-array name="interval_labels">
+        <item>10 s</item>
+        <item>15 s</item>
+        <item>30 s</item>
+        <item>60 s</item>
+    </string-array>
+    <string-array name="interval_values">
+        <item>10</item>
+        <item>15</item>
+        <item>30</item>
+        <item>60</item>
+    </string-array>
+    <string-array name="session_labels">
+        <item>2 min</item>
+        <item>5 min</item>
+        <item>10 min</item>
+    </string-array>
+    <string-array name="session_values">
+        <item>2</item>
+        <item>5</item>
+        <item>10</item>
+    </string-array>
+    <string-array name="alarm_route_labels">
+        <item>A: speakerphone + call stream</item>
+        <item>B: A + in-call mode</item>
+        <item>C: force media to speaker (hidden API)</item>
+        <item>D: ringtone stream (speaker AND jack, reference)</item>
+    </string-array>
+    <string-array name="alarm_route_values">
+        <item>speakerphone</item>
+        <item>incall</item>
+        <item>forcemedia</item>
+        <item>ring</item>
+    </string-array>
+    <string-array name="alarm_delay_labels">
+        <item>No delay</item>
+        <item>10 s (testing)</item>
+        <item>30 s</item>
+    </string-array>
+    <string-array name="alarm_delay_values">
+        <item>0</item>
+        <item>10</item>
+        <item>30</item>
+    </string-array>
 </resources>
