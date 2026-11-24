@@ -46,7 +46,7 @@ public final class SessionLogic {
 		/** The state changed: listening mode, wake locks and notifications may need updating. */
 		void stateChanged();
 
-		/** false while something (an alarm ringing) must not be interrupted by transmissions */
+		/** false while transmissions must wait */
 		boolean canTransmit();
 	}
 
@@ -66,7 +66,7 @@ public final class SessionLogic {
 	public long sessionMs = 5 * 60 * 1000;
 	public int toneMs = 18000;
 	public static final long ACK_TIMEOUT = 15000;   // wait for SESSION_OK after our tone + frame
-	public static final int RETRY_JITTER = 10000;   // random extra wait, so two phones opening at once stop colliding
+	public static final int RETRY_JITTER = 15000;   // random extra wait, so two phones opening at once stop colliding
 	public static final int MAX_ATTEMPTS = 3;
 	public static final long WOKEN_TIMEOUT = 45000; // after hearing a tone, wait this long for a frame
 	public static final long RX_GUARD = 2000;       // the other radio's VOX is still keyed this long after its frame
@@ -94,7 +94,7 @@ public final class SessionLogic {
 	private long lastRxAt = -RX_GUARD;
 	private long toneHeardAt = -TONE_MEMORY - 1;
 	private String lastKey;
-	private final Random random = new Random();
+	private Random random = new Random();
 
 	public SessionLogic(Clock clock, Actions actions, HeaderSource headers) {
 		this.clock = clock;
@@ -105,6 +105,11 @@ public final class SessionLogic {
 	/** where control frames get their header from (the station settings) */
 	public interface HeaderSource {
 		String header();
+	}
+
+	/** for reproducible simulations */
+	public void setRandomSeed(long seed) {
+		random = new Random(seed);
 	}
 
 	public State state() {
@@ -194,7 +199,7 @@ public final class SessionLogic {
 		current = null;
 		long now = clock.now();
 		if (done != null && done == opening && state == State.OPENING)
-			ackDeadline = now + ACK_TIMEOUT + (attempts > 1 ? random.nextInt(RETRY_JITTER) : 0);
+			ackDeadline = now + ACK_TIMEOUT + random.nextInt(RETRY_JITTER);
 		if (state == State.SESSION && !closeSent)
 			extend(now);
 		if (closeSent && txQueue.isEmpty()) {
@@ -224,6 +229,9 @@ public final class SessionLogic {
 			state = State.WOKEN;
 			wokenDeadline = now + WOKEN_TIMEOUT;
 			actions.stateChanged();
+		} else if (state == State.WOKEN) {
+			// a repeated call (we missed its frame): stay awake for this one too
+			wokenDeadline = now + WOKEN_TIMEOUT;
 		}
 	}
 

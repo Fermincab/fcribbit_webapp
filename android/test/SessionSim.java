@@ -128,6 +128,7 @@ public class SessionSim {
 		Phone a = new Phone("Ana", "LU1AAA"), b = new Phone("Beto", "LU2BBB");
 		a.peer = b; b.peer = a;
 		a.phase = rnd.nextInt(15000); b.phase = rnd.nextInt(15000);
+		a.logic.setRandomSeed(seed * 31 + 1); b.logic.setRandomSeed(seed * 31 + 2);
 		run(a, b, 20000);
 		return new Phone[] { a, b };
 	}
@@ -198,6 +199,14 @@ public class SessionSim {
 		a.say("de A"); b.say("de B");
 		run(a, b, 3 * 60000);
 		check("simultaneous opening: both messages arrive", count(b.chat, "< de A") == 1 && count(a.chat, "< de B") == 1);
+		int both = 0, sims = 200;
+		for (int s = 0; s < sims; s++) {
+			p = pair(1000 + s); a = p[0]; b = p[1];
+			a.say("de A"); b.say("de B"); run(a, b, 3 * 60000);
+			if (count(b.chat, "< de A") == 1 && count(a.chat, "< de B") == 1) both++;
+		}
+		System.out.printf("     simultaneous opening, %d runs: both messages delivered in %d%n", sims, both);
+		check("simultaneous opening: >= 97% resolve", both >= sims * 0.97);
 
 		// 7. robustness: random sleep phases and 10% frame loss, 200 runs
 		int ok = 0, dup = 0, runs = 200;

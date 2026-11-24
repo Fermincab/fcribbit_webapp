@@ -36,8 +36,6 @@ import java.util.concurrent.Executors;
 public class RibbitService extends Service implements AudioEngine.Listener, SessionLogic.Actions {
 	public static final String ACTION_START = "com.fcribbit.ribbit.START";
 	public static final String ACTION_CHECK = "com.fcribbit.ribbit.CHECK";
-	public static final String ACTION_ALARM_RINGING = "com.fcribbit.ribbit.ALARM_RINGING";
-	public static final String ACTION_ALARM_DONE = "com.fcribbit.ribbit.ALARM_DONE";
 
 	public static final String MODE_INTERMITTENT = "intermittent";
 	public static final String MODE_CONTINUOUS = "continuous";
@@ -123,10 +121,6 @@ public class RibbitService extends Service implements AudioEngine.Listener, Sess
 			wakeLock.acquire();
 			WakeReceiver.releaseLock();
 			runCheck();
-		} else if (ACTION_ALARM_RINGING.equals(action)) {
-			update();
-		} else if (ACTION_ALARM_DONE.equals(action)) {
-			update();
 		} else {
 			update();
 		}
@@ -234,11 +228,7 @@ public class RibbitService extends Service implements AudioEngine.Listener, Sess
 		String mode = mode();
 		boolean background = !MODE_FOREGROUND.equals(mode);
 		boolean continuous = uiVisible || logic.busy() || MODE_CONTINUOUS.equals(mode);
-		if (AlarmActivity.ringing) {
-			// the alarm may switch audio modes; keep the phone awake but leave the mic alone
-			engine.stopListening();
-			wakeLock.acquire();
-		} else if (continuous) {
+		if (continuous) {
 			alarms.cancel(checkIntent);
 			if (!checking)
 				engine.startListening();
@@ -266,7 +256,7 @@ public class RibbitService extends Service implements AudioEngine.Listener, Sess
 	}
 
 	private void stopSelfIfIdle() {
-		if (!bound && !logic.busy() && !AlarmActivity.ringing) {
+		if (!bound && !logic.busy()) {
 			engine.stopListening();
 			alarms.cancel(checkIntent);
 			if (wakeLock.isHeld())
@@ -281,8 +271,7 @@ public class RibbitService extends Service implements AudioEngine.Listener, Sess
 
 	/** one intermittent check: listen about a second for the wake tone */
 	private void runCheck() {
-		if (checking || uiVisible || logic.busy() || !modemOk || AlarmActivity.ringing
-				|| !MODE_INTERMITTENT.equals(mode())) {
+		if (checking || uiVisible || logic.busy() || !modemOk || !MODE_INTERMITTENT.equals(mode())) {
 			update();
 			return;
 		}
@@ -364,7 +353,7 @@ public class RibbitService extends Service implements AudioEngine.Listener, Sess
 
 	public void transmit(SessionLogic.Outgoing o, int toneMs) {
 		float gain = parseFloat(prefs.getString("txLevel", "0.75"), 0.75f);
-		if (!engine.isListening() && !AlarmActivity.ringing)
+		if (!engine.isListening())
 			engine.startListening(); // so the decoder is muted and we hear the reply right after
 		wakeLock.acquire();
 		if (!engine.transmit(o.payload, gain, toneMs))
@@ -446,7 +435,7 @@ public class RibbitService extends Service implements AudioEngine.Listener, Sess
 	}
 
 	public boolean canTransmit() {
-		return !AlarmActivity.ringing;
+		return true; // the alarm rings on the call stream; Ribbit's audio still goes to the jack
 	}
 
 	// ------------------------------------------------------------- misc

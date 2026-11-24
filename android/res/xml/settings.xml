@@ -67,18 +67,6 @@
     </PreferenceCategory>
 
     <PreferenceCategory android:title="@string/cat_alarm">
-        <ListPreference
-            android:key="alarmRoute"
-            android:title="@string/alarm_route"
-            android:entries="@array/alarm_route_labels"
-            android:entryValues="@array/alarm_route_values"
-            android:defaultValue="speakerphone" />
-        <ListPreference
-            android:key="alarmDelay"
-            android:title="@string/alarm_delay"
-            android:entries="@array/alarm_delay_labels"
-            android:entryValues="@array/alarm_delay_values"
-            android:defaultValue="10" />
         <Preference
             android:key="alarmTest"
             android:title="@string/alarm_test"

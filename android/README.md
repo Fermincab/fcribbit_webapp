@@ -49,21 +49,18 @@ sin sonido: un sonido saldría por el jack y activaría el VOX de la radio.
 
 ## Alarma
 
-El botón **Alarma** manda `CTL1:ALARM`. El teléfono que la recibe abre una pantalla completa y,
-pasado el retardo configurable (10 s por defecto, para que alcances a conectar los auriculares
-durante la prueba), hace sonar el tono de llamada hasta que toques la pantalla o cualquier tecla.
-La idea es que suene **solo por el parlante del teléfono**. Android 2.3 no tiene una forma
-oficial de hacerlo, así que hay cuatro métodos para probar en *Ajustes → Salida del sonido de alarma*:
+El botón **Alarma** manda `CTL1:ALARM`. El teléfono que la recibe abre una pantalla completa y hace
+sonar el tono de llamada **de inmediato**, hasta que toques la pantalla o cualquier tecla (el botón
+de encendido incluido). Si nadie la detiene, se corta sola al minuto.
 
-| | Método | Qué hace |
-|---|---|---|
-| A | Altavoz + canal de llamada | `setSpeakerphoneOn(true)` y reproducción en `STREAM_VOICE_CALL` |
-| B | A + modo en llamada | Lo mismo, con `MODE_IN_CALL`; algunos equipos solo cambian la ruta en ese modo |
-| C | Forzar multimedia | Método oculto `AudioSystem.setForceUse(FOR_MEDIA, FORCE_SPEAKER)` |
-| D | Canal de timbre | Comportamiento normal de Android: parlante **y** jack. Sirve como referencia |
+Suena **solo por el parlante del teléfono**, aunque el cable de la radio esté conectado. Para eso
+activa el altavoz y reproduce el timbre por el canal de llamada, como una llamada en manos libres;
+Android manda ese canal al parlante aunque haya algo en el jack. El audio de Ribbit usa el canal
+multimedia, que sigue saliendo por el jack, así que el teléfono puede transmitir (por ejemplo, la
+confirmación de sesión) mientras suena la alarma. Se probó en el Galaxy Y Pro. Forzar el canal
+multimedia con la API oculta `AudioSystem.setForceUse` no funcionó.
 
-La pantalla de la alarma muestra qué método se usó y si el sistema aceptó cada ajuste.
-*Probar la alarma en este teléfono* la hace sonar localmente, sin usar la radio.
+*Ajustes → Probar la alarma en este teléfono* la hace sonar localmente, sin usar la radio.
 
 ## Instalar
 

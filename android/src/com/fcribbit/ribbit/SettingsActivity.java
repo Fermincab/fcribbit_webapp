@@ -36,8 +36,7 @@ public class SettingsActivity extends PreferenceActivity implements SharedPrefer
 		});
 		findPreference("alarmTest").setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
 			public boolean onPreferenceClick(Preference p) {
-				startActivity(new Intent(SettingsActivity.this, AlarmActivity.class)
-						.putExtra(AlarmActivity.EXTRA_LOCAL_TEST, true));
+				startActivity(new Intent(SettingsActivity.this, AlarmActivity.class));
 				return true;
 			}
 		});
@@ -50,7 +49,7 @@ public class SettingsActivity extends PreferenceActivity implements SharedPrefer
 	}
 
 	private static final String[] LIST_KEYS = { "txLevel", "micSource", "listenMode", "checkInterval",
-			"sessionMinutes", "alarmRoute", "alarmDelay" };
+			"sessionMinutes" };
 
 	private void updateBattery() {
 		SharedPreferences prefs = getPreferenceScreen().getSharedPreferences();
