@@ -17,7 +17,7 @@ import android.preference.PreferenceActivity;
 import android.widget.Toast;
 
 public class SettingsActivity extends PreferenceActivity implements SharedPreferences.OnSharedPreferenceChangeListener {
-	private static final String[] TEXT_KEYS = { "name", "callsign", "gridsquare", "phone" };
+	private static final String[] TEXT_KEYS = { "name", "callsign", "gridsquare", "phone", "groupCode" };
 
 	private final Handler handler = new Handler();
 	private LocationManager locationManager;
@@ -80,7 +80,7 @@ public class SettingsActivity extends PreferenceActivity implements SharedPrefer
 	public void onSharedPreferenceChanged(SharedPreferences prefs, String key) {
 		updateSummary(key);
 		// the background service picks up the listening mode / interval
-		if (key.equals("listenMode") || key.equals("checkInterval"))
+		if (key.equals("listenMode") || key.equals("checkInterval") || key.equals("groupCode"))
 			startService(new Intent(this, RibbitService.class).setAction(RibbitService.ACTION_START));
 	}
 

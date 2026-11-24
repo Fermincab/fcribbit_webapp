@@ -63,7 +63,7 @@
     <string name="session_no_response">Sin confirmación del otro teléfono (el mensaje puede haber llegado igual)</string>
     <string name="session_queued">En cola: sale cuando se abra la sesión</string>
     <string name="session_closing">La sesión se cierra en %1$d s</string>
-    <string name="status_calling">Llamando (tono de aviso)…</string>
+    <string name="status_calling">Llamando (señal de inicio)…</string>
     <string name="status_waiting_ack">Esperando confirmación (%1$d/%2$d)…</string>
     <string name="status_woken">Despertado, esperando…</string>
     <string name="status_session">Sesión · %1$s</string>
@@ -87,4 +87,6 @@
     <string name="debug_copy">Copiar</string>
     <string name="debug_clear">Borrar</string>
     <string name="debug_copied">Copiado al portapapeles</string>
+    <string name="group_code">Código de grupo</string>
+    <string name="group_code_help">El mismo código en todos los teléfonos del grupo. La señal de inicio de sesión (un siseo) se genera a partir de él: los teléfonos con otro código no se despiertan ni la reconocen. El intervalo de escucha también tiene que ser igual en todos.</string>
 </resources>

@@ -43,6 +43,13 @@
     </PreferenceCategory>
 
     <PreferenceCategory android:title="@string/cat_listen">
+        <EditTextPreference
+            android:key="groupCode"
+            android:title="@string/group_code"
+            android:dialogMessage="@string/group_code_help"
+            android:singleLine="true"
+            android:inputType="textNoSuggestions"
+            android:defaultValue="ribbit" />
         <ListPreference
             android:key="listenMode"
             android:title="@string/listen_mode"
@@ -54,7 +61,7 @@
             android:title="@string/check_interval"
             android:entries="@array/interval_labels"
             android:entryValues="@array/interval_values"
-            android:defaultValue="15" />
+            android:defaultValue="7" />
         <ListPreference
             android:key="sessionMinutes"
             android:title="@string/session_minutes"

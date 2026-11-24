@@ -27,25 +27,47 @@ Port nativo de la web app de Ribbit para teléfonos con Android 2.3, pensado par
 
 Ribbit sigue escuchando con la app cerrada y la pantalla apagada (*Ajustes → Escucha en segundo plano*):
 
-- **Intermitente** (predeterminado): el teléfono duerme y cada 15 s se despierta 1 s a buscar el
-  **tono de aviso**, una secuencia bitono de 1000/1800 Hz.
+- **Intermitente** (predeterminado): el teléfono duerme y cada **7 s** (configurable entre 5 y
+  60 s) se despierta ~0,7 s para buscar la **señal de inicio de sesión** de su grupo.
 - **Continua**: siempre escuchando, para teléfonos conectados al cargador.
 - **Solo con la app abierta**: el comportamiento original.
 
-Las **sesiones** forman parte del envío normal:
+### Señal de inicio y código de grupo
 
-1. Si no hay sesión abierta, el primer mensaje sale precedido por el tono de aviso, que dura el
-   intervalo más 3 s (18 s con el intervalo de 15 s). Se repite, tono incluido, hasta que el otro
-   teléfono confirme, con un máximo de 3 intentos. Lo que escribas mientras tanto queda en cola.
-2. El teléfono que escuchó el tono se queda despierto, recibe el mensaje y confirma con
+La señal de inicio **suena como ruido**: un siseo, como una portadora con estática. Técnicamente
+es una secuencia pseudoaleatoria de 128 ms, filtrada a 400–2600 Hz y repetida, que se genera a
+partir del **código de grupo** (*Ajustes → Código de grupo*). Para detectarla, el teléfono pliega
+512 ms de audio sobre un período y lo compara con la secuencia conocida (correlación PHAT): la
+señal repetida se refuerza y el ruido no.
+
+- **Los teléfonos con otro código no se despiertan** ni la reconocen.
+- Se detecta **por debajo del nivel de ruido** (−8 dB), a través de un enlace FM simulado
+  (filtros, preénfasis/deénfasis, limitador) y con relojes desfasados ±500 ppm.
+- No se dispara con ruido, voz, tonos fijos, tramas Ribbit, la señal de otro grupo ni otras
+  señales que se repiten cada 128 ms.
+- Dura **el intervalo + 2,5 s** (9,5 s con el intervalo de 7 s). Por eso **todos los teléfonos del
+  grupo tienen que usar el mismo código y el mismo intervalo**.
+
+Con baterías de teléfono al 50 % y modo avión, la estimación es de unas 40 h con el intervalo de
+7 s, en línea con lo que dura un UV-5R con VOX. *Ajustes → Consumo de batería* mide el valor real.
+
+### Sesiones
+
+1. Si no hay sesión abierta, el primer mensaje sale precedido por la señal de inicio y se repite,
+   señal incluida, hasta que el otro teléfono confirme, con un máximo de 3 intentos y una espera
+   aleatoria entre intentos. Lo que escribas mientras tanto queda en cola.
+2. El teléfono que escuchó la señal se queda despierto, recibe el mensaje y confirma con
    `CTL1:SESSION_OK`.
-3. Durante la sesión, los mensajes salen sin tono. Cada mensaje enviado o recibido extiende la
+3. Durante la sesión, los mensajes salen sin la señal. Cada mensaje enviado o recibido extiende la
    sesión 5 minutos, y 30 s antes del cierre aparece un aviso.
 4. Al vencer la sesión, el teléfono que la abrió manda `CTL1:SESSION_END` y los dos vuelven a dormir.
-   El próximo mensaje vuelve a mandar el tono.
+   El próximo mensaje vuelve a mandar la señal de inicio.
 
 Los mensajes recibidos en segundo plano generan una notificación **solo con vibración y LED**,
 sin sonido: un sonido saldría por el jack y activaría el VOX de la radio.
+
+*Menú → Diagnóstico* muestra lo que pasa por dentro (tramas, señales de inicio, sesiones,
+micrófono) y permite copiarlo.
 
 ## Alarma
 
@@ -109,7 +131,8 @@ test/run_tests.sh
 3. El código Java de la app (`Payload`, `RibbitCrypto`, `Modem` sobre una compilación JNI para el
    host) contra el `ribbit.wasm` compilado de la web app, por audio, en las dos direcciones y con
    mensajes cifrados y sin cifrar.
-4. El detector del tono de aviso: con ruido, con nivel bajo y saturado, y sin falsas detecciones
-   con ruido, tonos fijos (incluido el de 1750 Hz), voz simulada ni tramas Ribbit.
+4. El detector de la señal de inicio: por debajo del ruido, a través de un enlace FM simulado, con
+   relojes desfasados y solapamiento parcial; sin falsas detecciones con ruido, voz, tonos fijos,
+   tramas Ribbit ni la señal de otro grupo.
 5. El protocolo de sesiones con dos teléfonos simulados en un canal semidúplex con VOX, ciclos de
    sueño de fase aleatoria, pérdidas de tramas, colisiones y un teléfono apagado.

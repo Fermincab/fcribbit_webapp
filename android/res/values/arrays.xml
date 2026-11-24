@@ -39,12 +39,16 @@
         <item>foreground</item>
     </string-array>
     <string-array name="interval_labels">
+        <item>5 s</item>
+        <item>7 s</item>
         <item>10 s</item>
         <item>15 s</item>
         <item>30 s</item>
         <item>60 s</item>
     </string-array>
     <string-array name="interval_values">
+        <item>5</item>
+        <item>7</item>
         <item>10</item>
         <item>15</item>
         <item>30</item>

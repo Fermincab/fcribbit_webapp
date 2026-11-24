@@ -10,8 +10,10 @@ public class SessionSim {
 	static final int FRAME_MS = 1800;       // one Ribbit frame on air
 	static final int GAP_MS = 300;          // between the wake tone and the frame
 	static final int VOX_HANG = 1500;       // radio keeps transmitting after the audio stops
-	static final int CHECK_MS = 1000;       // intermittent listening window
-	static final int MIN_TONE_IN_WINDOW = 600;
+	static final int SETTLE_MS = 200;       // mic start-up, ignored
+	static final int CHECK_MS = 700;        // awake per check: settle + 512 ms detector window
+	static final int MIN_TONE_IN_WINDOW = 300; // overlap the detector needs (measured: ~30 ms clean, 300 ms with margin)
+	static final int INTERVAL = Integer.getInteger("interval", 7000);
 
 	static long now;
 	static Random rnd;
@@ -34,7 +36,7 @@ public class SessionSim {
 		final String name;
 		final SessionLogic logic;
 		final String header;
-		int interval = 15000;
+		int interval = INTERVAL;
 		long phase;
 		boolean powered = true;
 		double rxLoss;          // probability of losing a received frame
@@ -51,6 +53,7 @@ public class SessionSim {
 			this.header = Payload.header(name, call, "GF05", "");
 			logic = new SessionLogic(new SessionLogic.Clock() { public long now() { return now; } }, this,
 					new SessionLogic.HeaderSource() { public String header() { return header; } });
+			logic.toneMs = INTERVAL + 2500; // as RibbitService: interval + WAKE_MARGIN_MS
 		}
 
 		void say(String text) {
@@ -81,7 +84,9 @@ public class SessionSim {
 
 		boolean continuous() { return powered && (logic.busy() || myTx != null); }
 		boolean radioKeyed() { for (Tx t : air) if (t.from == this && now >= t.start && now < t.keyedUntil) return true; return false; }
-		boolean checking() { return powered && !continuous() && ((now - phase) % interval + interval) % interval < CHECK_MS; }
+		long inCycle() { return ((now - phase) % interval + interval) % interval; }
+		boolean awakeChecking() { return powered && !continuous() && inCycle() < CHECK_MS; }
+		boolean checking() { return awakeChecking() && inCycle() >= SETTLE_MS; }
 	}
 
 	/** run the world for ms milliseconds */
@@ -91,7 +96,7 @@ public class SessionSim {
 			now += STEP;
 			for (Phone p : new Phone[] { a, b }) {
 				if (!p.powered) continue;
-				if (p.continuous() || p.checking()) p.awakeMs += STEP;
+				if (p.continuous() || p.awakeChecking()) p.awakeMs += STEP;
 				// our own audio finished?
 				if (p.myTx != null && now >= p.myTx.frameEnd) { p.myTx = null; p.logic.onTxDone(); }
 				Phone q = p.peer;
@@ -127,7 +132,7 @@ public class SessionSim {
 		now = 0; air.clear(); rnd = new Random(seed);
 		Phone a = new Phone("Ana", "LU1AAA"), b = new Phone("Beto", "LU2BBB");
 		a.peer = b; b.peer = a;
-		a.phase = rnd.nextInt(15000); b.phase = rnd.nextInt(15000);
+		a.phase = rnd.nextInt(INTERVAL); b.phase = rnd.nextInt(INTERVAL);
 		a.logic.setRandomSeed(seed * 31 + 1); b.logic.setRandomSeed(seed * 31 + 2);
 		run(a, b, 20000);
 		return new Phone[] { a, b };
@@ -226,8 +231,8 @@ public class SessionSim {
 		p = pair(7); a = p[0];
 		long before = a.awakeMs; run(a, p[1], 3600000);
 		double duty = (a.awakeMs - before) / 3600000.0;
-		System.out.printf("     idle hour: awake %.1f%% of the time (check window only)%n", duty * 100);
-		check("idle duty cycle about 1 s every 15 s", duty > 0.05 && duty < 0.08);
+		System.out.printf("     idle hour, %d s interval: awake %.1f%% of the time (checks only)%n", INTERVAL / 1000, duty * 100);
+		check("idle duty cycle = check time / interval", Math.abs(duty - CHECK_MS / (double) INTERVAL) < 0.01);
 
 		System.out.println(fails == 0 ? "SessionSim: all passed" : "SessionSim: " + fails + " FAILED");
 		System.exit(fails == 0 ? 0 : 1);

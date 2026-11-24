@@ -45,7 +45,8 @@ public class RibbitService extends Service implements AudioEngine.Listener, Sess
 
 	private static final int NOTE_STATUS = 1;
 	private static final int NOTE_MESSAGE = 2;
-	private static final int CHECK_WINDOW_MS = 1000;
+	/** the wake signal lasts the check interval plus this, so a sleeping phone can't miss it */
+	private static final int WAKE_MARGIN_MS = 2500;
 	private static final int MAX_MESSAGES = 500;
 
 	public interface UiListener {
@@ -220,12 +221,13 @@ public class RibbitService extends Service implements AudioEngine.Listener, Sess
 	}
 
 	private int intervalMs() {
-		return parseInt(prefs.getString("checkInterval", "15"), 15) * 1000;
+		return parseInt(prefs.getString("checkInterval", "7"), 7) * 1000;
 	}
 
 	private void applySettings() {
 		logic.sessionMs = parseInt(prefs.getString("sessionMinutes", "5"), 5) * 60000L;
-		logic.toneMs = intervalMs() + CHECK_WINDOW_MS + 2000; // 15 s -> 18 s
+		logic.toneMs = intervalMs() + WAKE_MARGIN_MS; // 7 s -> 9.5 s
+		engine.setGroupCode(prefs.getString("groupCode", WakeTone.DEFAULT_CODE));
 		engine.setMicSource(parseInt(prefs.getString("micSource", "6"), 6));
 	}
 
@@ -293,9 +295,7 @@ public class RibbitService extends Service implements AudioEngine.Listener, Sess
 		checking = true;
 		new Thread(new Runnable() {
 			public void run() {
-				final boolean heard = engine.checkOnce(CHECK_WINDOW_MS);
-				if (heard)
-					DebugLog.log("sleep check: wake tone heard");
+				final boolean heard = engine.checkOnce();
 				handler.post(new Runnable() {
 					public void run() {
 						checking = false;

@@ -1,0 +1,13 @@
+-nowarn
+-Xlint:-options
+-encoding
+UTF-8
+-source
+8
+-target
+8
+-bootclasspath
+/home/claude/sdk/platform-10/android.jar
+-d
+obj/classes
+@obj/sources.txt

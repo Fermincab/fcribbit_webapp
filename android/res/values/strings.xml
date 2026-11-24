@@ -68,7 +68,7 @@
     <string name="session_no_response">No confirmation from the other phone (the message may still have arrived)</string>
     <string name="session_queued">Queued: it goes out once the session is open</string>
     <string name="session_closing">The session closes in %1$d s</string>
-    <string name="status_calling">Calling (wake tone)…</string>
+    <string name="status_calling">Calling (session signal)…</string>
     <string name="status_waiting_ack">Waiting for confirmation (%1$d/%2$d)…</string>
     <string name="status_woken">Woken up, waiting…</string>
     <string name="status_session">Session · %1$s</string>
@@ -92,4 +92,6 @@
     <string name="debug_copy">Copy</string>
     <string name="debug_clear">Clear</string>
     <string name="debug_copied">Copied to the clipboard</string>
+    <string name="group_code">Group code</string>
+    <string name="group_code_help">Same code on every phone of the group. The session call (a hiss) is made from it: phones with another code neither wake up nor recognise it. The check interval must also be the same on all phones.</string>
 </resources>

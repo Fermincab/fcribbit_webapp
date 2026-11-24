@@ -13,7 +13,7 @@ import android.os.Process;
  * 8 kHz audio for the modem.
  *
  * - continuous listening: AudioRecord feeds the decoder and the wake tone detector
- * - checkOnce(): a short listen used by the intermittent (sleep) mode, wake tone only
+ * - checkOnce(): a short listen used by the intermittent (sleep) mode, wake signal only
  * - transmit(): optional wake tone, then the Ribbit frame, through AudioTrack
  *
  * Like the web app, the decoder gets silence while we transmit so we don't decode ourselves.
@@ -62,6 +62,19 @@ public final class AudioEngine {
 		if (running) {
 			DebugLog.log("mic source changed to " + source);
 			reopen();
+		}
+	}
+
+	private volatile WakeTone wake = new WakeTone(WakeTone.DEFAULT_CODE);
+	private String groupCode = WakeTone.DEFAULT_CODE;
+
+	/** the group code decides which wake signal we send and react to */
+	public synchronized void setGroupCode(String code) {
+		String c = code == null || code.trim().length() == 0 ? WakeTone.DEFAULT_CODE : code.trim();
+		if (!c.equals(groupCode)) {
+			groupCode = c;
+			wake = new WakeTone(c);
+			DebugLog.log("group code changed");
 		}
 	}
 
@@ -193,7 +206,8 @@ public final class AudioEngine {
 		Process.setThreadPriority(Process.THREAD_PRIORITY_URGENT_AUDIO);
 		short[] pcm = new short[READ_SAMPLES];
 		byte[] payload = new byte[Modem.PAYLOAD_BYTES];
-		WakeTone.Detector detector = new WakeTone.Detector();
+		WakeTone signal = wake;
+		WakeTone.Detector detector = signal.detector();
 		long lastLevel = 0, lastTone = 0;
 		int openFailures = 0;
 		while (running && gen == generation) {
@@ -236,9 +250,13 @@ public final class AudioEngine {
 							pcm[i] = 0;
 					}
 					long now = lastReadAt;
+					if (wake != signal) {
+						signal = wake;
+						detector = signal.detector();
+					}
 					if (detector.process(pcm, 0, n) && now - lastTone > 2000) {
 						lastTone = now;
-						DebugLog.log("wake tone heard");
+						DebugLog.log(String.format("wake signal heard (score %.2f)", detector.lastScore()));
 						main.post(new Runnable() {
 							public void run() {
 								listener.onWakeTone();
@@ -291,31 +309,33 @@ public final class AudioEngine {
 	}
 
 	/**
-	 * Intermittent mode: listen for windowMs (after letting the mic settle) and say
-	 * whether the wake tone is on air. Blocking: call from a worker thread, never
-	 * while continuous listening is running.
+	 * Intermittent mode: let the mic settle, listen for one detector window (512 ms) and
+	 * say whether our group's wake signal is on air. Blocking: call from a worker thread,
+	 * never while continuous listening is running.
 	 */
-	public boolean checkOnce(int windowMs) {
+	public boolean checkOnce() {
 		synchronized (micLock) {
 			AudioRecord rec = openRecorder();
 			if (rec == null)
 				return false;
-			WakeTone.Detector detector = new WakeTone.Detector();
+			WakeTone.Detector detector = wake.detector();
 			short[] pcm = new short[READ_SAMPLES];
 			boolean heard = false;
 			try {
 				rec.startRecording();
-				int skip = RATE * SETTLE_MS / 1000, want = RATE * windowMs / 1000, got = 0;
-				while (got < skip + want) {
-					int n = rec.read(pcm, 0, pcm.length);
+				int skip = RATE * SETTLE_MS / 1000, got = 0;
+				while (got < skip + WakeTone.WINDOW) {
+					int want = got < skip ? skip - got : skip + WakeTone.WINDOW - got;
+					int n = rec.read(pcm, 0, Math.min(pcm.length, want));
 					if (n <= 0)
 						break;
-					if (got >= skip && !transmitting && detector.process(pcm, 0, n)) {
-						heard = true;
-						break;
-					}
+					if (got >= skip)
+						detector.process(pcm, 0, n);
 					got += n;
 				}
+				heard = !transmitting && detector.evaluateNow();
+				if (heard)
+					DebugLog.log(String.format("sleep check: wake signal heard (score %.2f)", detector.lastScore()));
 			} catch (Exception e) {
 				// treat as nothing heard
 			} finally {
@@ -357,7 +377,7 @@ public final class AudioEngine {
 			public void run() {
 				Process.setThreadPriority(Process.THREAD_PRIORITY_URGENT_AUDIO);
 				try {
-					play(render(payload, gain, toneMs));
+					play(render(wake, payload, gain, toneMs));
 				} finally {
 					// let the speaker's tail die out before listening again
 					try {
@@ -380,8 +400,8 @@ public final class AudioEngine {
 	}
 
 	/** 100 ms silence + [wake tone + 300 ms] + frame + 200 ms silence */
-	private static short[] render(byte[] payload, float gain, int toneMs) {
-		short[] tone = toneMs > 0 ? WakeTone.generate(toneMs, gain) : new short[0];
+	private static short[] render(WakeTone wake, byte[] payload, float gain, int toneMs) {
+		short[] tone = toneMs > 0 ? wake.generate(toneMs, gain) : new short[0];
 		int gap = toneMs > 0 ? RATE * 3 / 10 : 0;
 		int lead = RATE / 10, tail = RATE / 5;
 		short[] frame = new short[RATE * 4];
