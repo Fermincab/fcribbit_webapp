@@ -88,4 +88,8 @@
     <string name="cat_alarm">Alarm</string>
     <string name="alarm_test">Test the alarm on this phone</string>
     <string name="alarm_test_summary">Rings here on the loudspeaker, nothing is sent</string>
+    <string name="debug">Diagnostics</string>
+    <string name="debug_copy">Copy</string>
+    <string name="debug_clear">Clear</string>
+    <string name="debug_copied">Copied to the clipboard</string>
 </resources>

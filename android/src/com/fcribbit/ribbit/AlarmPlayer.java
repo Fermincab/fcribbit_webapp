@@ -39,6 +39,7 @@ public final class AlarmPlayer {
 		active = true;
 		savedSpeaker = am.isSpeakerphoneOn();
 		am.setSpeakerphoneOn(true);
+		DebugLog.log("alarm: speakerphone on -> " + am.isSpeakerphoneOn() + ", mode=" + am.getMode());
 		savedVolume = am.getStreamVolume(STREAM);
 		am.setStreamVolume(STREAM, am.getStreamMaxVolume(STREAM), 0);
 		if (!playRingtone())
@@ -73,6 +74,7 @@ public final class AlarmPlayer {
 			// ignore
 		}
 		am.setSpeakerphoneOn(savedSpeaker);
+		DebugLog.log("alarm: stopped, speakerphone -> " + am.isSpeakerphoneOn() + ", mode=" + am.getMode());
 	}
 
 	private boolean playRingtone() {

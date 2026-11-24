@@ -33,6 +33,7 @@ import java.util.concurrent.Executors;
 public class MainActivity extends Activity implements RibbitService.UiListener {
 	private static final int MENU_SETTINGS = 1;
 	private static final int MENU_CLEAR = 2;
+	private static final int MENU_DEBUG = 3;
 
 	private final Handler handler = new Handler();
 	/** PBKDF2 runs here so the UI doesn't stall */
@@ -181,6 +182,7 @@ public class MainActivity extends Activity implements RibbitService.UiListener {
 	public boolean onCreateOptionsMenu(Menu menu) {
 		menu.add(0, MENU_SETTINGS, 0, R.string.settings).setIcon(android.R.drawable.ic_menu_preferences);
 		menu.add(0, MENU_CLEAR, 1, R.string.clear_messages).setIcon(android.R.drawable.ic_menu_delete);
+		menu.add(0, MENU_DEBUG, 2, R.string.debug).setIcon(android.R.drawable.ic_menu_info_details);
 		return true;
 	}
 
@@ -189,6 +191,9 @@ public class MainActivity extends Activity implements RibbitService.UiListener {
 		switch (item.getItemId()) {
 			case MENU_SETTINGS:
 				openSettings();
+				return true;
+			case MENU_DEBUG:
+				startActivity(new Intent(this, DebugActivity.class));
 				return true;
 			case MENU_CLEAR:
 				new AlertDialog.Builder(this).setMessage(R.string.clear_messages_confirm)

@@ -124,6 +124,7 @@ public class RibbitService extends Service implements AudioEngine.Listener, Sess
 			WakeReceiver.releaseLock();
 			runCheck();
 		} else if (ACTION_AUDIO_ROUTE.equals(action)) {
+			DebugLog.log("audio route changed by the alarm (listening=" + engine.isListening() + ")");
 			handler.postDelayed(new Runnable() {
 				public void run() {
 					if (engine.isListening())
@@ -236,6 +237,7 @@ public class RibbitService extends Service implements AudioEngine.Listener, Sess
 		}
 		applySettings();
 		String mode = mode();
+		boolean wasListening = engine.isListening();
 		boolean background = !MODE_FOREGROUND.equals(mode);
 		boolean continuous = uiVisible || logic.busy() || MODE_CONTINUOUS.equals(mode);
 		if (continuous) {
@@ -259,6 +261,9 @@ public class RibbitService extends Service implements AudioEngine.Listener, Sess
 			ticking = true;
 			handler.post(ticker);
 		}
+		if (wasListening != engine.isListening())
+			DebugLog.log("listening " + (engine.isListening() ? "continuous" : "stopped (" + (background ? "sleep cycle" : "app closed") + ")")
+					+ ", session " + logic.state());
 		updateStatusNotification(background);
 		if (!background && !uiVisible && !logic.busy())
 			stopSelfIfIdle();
@@ -289,6 +294,8 @@ public class RibbitService extends Service implements AudioEngine.Listener, Sess
 		new Thread(new Runnable() {
 			public void run() {
 				final boolean heard = engine.checkOnce(CHECK_WINDOW_MS);
+				if (heard)
+					DebugLog.log("sleep check: wake tone heard");
 				handler.post(new Runnable() {
 					public void run() {
 						checking = false;
@@ -331,18 +338,26 @@ public class RibbitService extends Service implements AudioEngine.Listener, Sess
 
 	public void onPayload(byte[] payload, int result) {
 		if (result < 0) {
+			DebugLog.log("  -> ignored (CRC failed)");
 			toast(getString(R.string.bad_frame));
 			return;
 		}
 		Payload.Parsed p = Payload.parse(payload);
-		if (p.sender.length() > 0 && p.message != null && p.message.length() > 0)
+		DebugLog.log("  from '" + DebugLog.preview(p.sender) + "': '" + DebugLog.preview(p.message) + "'");
+		if (p.sender.length() > 0 && p.message != null && p.message.length() > 0) {
+			SessionLogic.State before = logic.state();
+			int count = messages.size();
 			logic.onFrame(p.sender, p.message);
-		else
+			DebugLog.log("  session " + before + " -> " + logic.state() + (messages.size() > count ? ", shown in chat" : ", not shown here"));
+		} else
 			addMessage(new ChatMessage(System.currentTimeMillis(), ChatMessage.IN, getString(R.string.unknown), p.text, false), true);
 	}
 
 	public void onWakeTone() {
+		SessionLogic.State before = logic.state();
 		logic.onToneHeard();
+		if (before != logic.state())
+			DebugLog.log("  session " + before + " -> " + logic.state());
 	}
 
 	public void onLevel(int percent) {
@@ -408,6 +423,7 @@ public class RibbitService extends Service implements AudioEngine.Listener, Sess
 	}
 
 	public void alarm(String sender) {
+		DebugLog.log("alarm received -> opening alarm screen");
 		String who = Payload.describeSender(sender);
 		addMessage(new ChatMessage(System.currentTimeMillis(), ChatMessage.ALERT, sender,
 				getString(R.string.alarm_received, who), false), true);
@@ -417,6 +433,7 @@ public class RibbitService extends Service implements AudioEngine.Listener, Sess
 	}
 
 	public void event(SessionLogic.Event e, int detail) {
+		DebugLog.log("session event " + e + (detail != 0 ? " " + detail : "") + " (state " + logic.state() + ")");
 		switch (e) {
 			case OPENED:
 				alert(getString(R.string.session_opened));

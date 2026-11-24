@@ -83,4 +83,8 @@
     <string name="cat_alarm">Alarma</string>
     <string name="alarm_test">Probar la alarma en este teléfono</string>
     <string name="alarm_test_summary">Suena acá por el parlante, no envía nada</string>
+    <string name="debug">Diagnóstico</string>
+    <string name="debug_copy">Copiar</string>
+    <string name="debug_clear">Borrar</string>
+    <string name="debug_copied">Copiado al portapapeles</string>
 </resources>

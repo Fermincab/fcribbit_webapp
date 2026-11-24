@@ -116,6 +116,7 @@ public final class AudioEngine {
 	 * switching can leave an open AudioRecord delivering nothing.
 	 */
 	public void reopen() {
+		DebugLog.log("mic: reopen requested");
 		reopenWanted = true;
 		AudioRecord r = current;
 		if (r != null) {
@@ -133,6 +134,8 @@ public final class AudioEngine {
 			if (!running)
 				return;
 			long stale = System.currentTimeMillis() - lastReadAt;
+			if (stale > 3000)
+				DebugLog.log("mic watchdog: no samples for " + stale + " ms");
 			if (stale > 6000) {
 				// the reading thread is stuck for good: leave it behind and start a new one
 				synchronized (AudioEngine.this) {
@@ -158,8 +161,10 @@ public final class AudioEngine {
 			AudioRecord r = null;
 			try {
 				r = new AudioRecord(source, RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, bufBytes);
-				if (r.getState() == AudioRecord.STATE_INITIALIZED)
+				if (r.getState() == AudioRecord.STATE_INITIALIZED) {
+					DebugLog.log("mic opened, source=" + source);
 					return r;
+				}
 			} catch (Exception e) {
 				// try the next source
 			}
@@ -202,8 +207,10 @@ public final class AudioEngine {
 					int n = rec.read(pcm, 0, pcm.length);
 					lastReadAt = System.currentTimeMillis();
 					if (n <= 0) {
-						if (++errors > 10)
+						if (++errors > 10) {
+							DebugLog.log("mic: read errors (" + n + "), reopening");
 							break; // reopen
+						}
 						sleep(20);
 						continue;
 					}
@@ -213,8 +220,10 @@ public final class AudioEngine {
 					for (int i = 0; i < n && allZero; ++i)
 						allZero = pcm[i] == 0;
 					zeros = allZero && !transmitting ? zeros + n : 0;
-					if (zeros > DEAD_SILENCE_SAMPLES)
+					if (zeros > DEAD_SILENCE_SAMPLES) {
+						DebugLog.log("mic: 8 s of digital silence, reopening");
 						break; // reopen
+					}
 					if (muted) {
 						for (int i = 0; i < n; ++i)
 							pcm[i] = 0;
@@ -222,6 +231,7 @@ public final class AudioEngine {
 					long now = lastReadAt;
 					if (detector.process(pcm, 0, n) && now - lastTone > 2000) {
 						lastTone = now;
+						DebugLog.log("wake tone heard");
 						main.post(new Runnable() {
 							public void run() {
 								listener.onWakeTone();
@@ -230,6 +240,8 @@ public final class AudioEngine {
 					}
 					final int result = Modem.decoderFeed(pcm, n, payload);
 					if (result != Modem.NOTHING) {
+						DebugLog.log(result < 0 ? "FRAME received, CRC FAILED (signal distorted or too weak)"
+								: "frame decoded OK, corrected bits=" + result);
 						final byte[] copy = payload.clone();
 						main.post(new Runnable() {
 							public void run() {
@@ -333,6 +345,7 @@ public final class AudioEngine {
 			return false;
 		transmitting = true;
 		muted = true;
+		DebugLog.log("TX start" + (toneMs > 0 ? " with wake tone " + toneMs + " ms" : ""));
 		new Thread(new Runnable() {
 			public void run() {
 				Process.setThreadPriority(Process.THREAD_PRIORITY_URGENT_AUDIO);
@@ -347,6 +360,7 @@ public final class AudioEngine {
 					}
 					muted = false;
 					transmitting = false;
+					DebugLog.log("TX done");
 					main.post(new Runnable() {
 						public void run() {
 							listener.onTxDone();

@@ -51,6 +51,11 @@
             android:taskAffinity=".alarm"
             android:configChanges="orientation|keyboardHidden|keyboard" />
 
+        <activity
+            android:name=".DebugActivity"
+            android:label="@string/debug"
+            android:configChanges="orientation|keyboardHidden|keyboard" />
+
         <service android:name=".RibbitService" android:exported="false" />
 
         <receiver android:name=".WakeReceiver">
