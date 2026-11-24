@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Ribbit</string>
+    <string name="version">v0.1.0</string>
+
+    <!-- chat -->
+    <string name="send">Send</string>
+    <string name="settings">Settings</string>
+    <string name="clear_messages">Clear messages</string>
+    <string name="clear_messages_confirm">Delete all messages?</string>
+    <string name="yes">Yes</string>
+    <string name="no">No</string>
+    <string name="messages_cleared">Messages cleared</string>
+    <string name="hint_message">Message</string>
+    <string name="listening">Listening</string>
+    <string name="transmitting">Transmitting…</string>
+    <string name="encrypting">Encrypting…</string>
+    <string name="mic_error">Microphone unavailable</string>
+    <string name="bad_frame">Received a damaged frame</string>
+    <string name="bytes_left">%1$d bytes left</string>
+    <string name="enc_bytes_left">%1$d bytes left (encrypted)</string>
+    <string name="too_long">Message too long. At most %1$d bytes with your current name/callsign/grid/phone.</string>
+    <string name="enc_too_long">Encrypted messages can be at most %1$d characters with your current name/callsign/grid/phone. Please shorten it.</string>
+    <string name="set_password">Set an encryption password in Settings, or turn encryption off.</string>
+    <string name="encryption_failed">Encryption failed, message not sent.</string>
+    <string name="enc_no_password">Encrypted message (set the password in Settings to read it)</string>
+    <string name="enc_wrong_password">Encrypted message (wrong password or damaged)</string>
+    <string name="unknown">unknown</string>
+    <string name="native_error">The modem library could not be loaded on this device.</string>
+    <string name="me">Me</string>
+
+    <!-- settings -->
+    <string name="cat_station">Station</string>
+    <string name="name">Name</string>
+    <string name="callsign">Callsign</string>
+    <string name="gridsquare">Grid square</string>
+    <string name="phone">Phone</string>
+    <string name="gps_grid">Get grid square from GPS</string>
+    <string name="gps_grid_summary">Uses the current location to fill in the grid square</string>
+    <string name="gps_waiting">Waiting for location…</string>
+    <string name="gps_off">Location services are off. Turn on GPS or wireless networks.</string>
+    <string name="gps_timeout">Could not get a location.</string>
+    <string name="cat_chat">Chat</string>
+    <string name="save_messages">Save messages</string>
+    <string name="save_messages_summary">Keep the chat history on this phone</string>
+    <string name="hide_senders">Hide sender and time</string>
+    <string name="hide_senders_summary">Don\'t show the name/time line above every message</string>
+    <string name="cat_audio">Audio</string>
+    <string name="tx_level">Transmit level</string>
+    <string name="mic_source">Microphone input</string>
+    <string name="cat_encryption">Encryption (experimental)</string>
+    <string name="encryption_enabled">Encrypt messages</string>
+    <string name="encryption_summary">AES-256-GCM, compatible with the Ribbit web app. Encrypting on amateur radio frequencies is generally prohibited (ITU RR Art. 25, FCC 97.113). Use only outside the amateur bands.</string>
+    <string name="encryption_password">Encryption password</string>
+    <string name="password_set">Password set</string>
+    <string name="password_not_set">No password</string>
+    <string name="not_set">Not set</string>
+</resources>

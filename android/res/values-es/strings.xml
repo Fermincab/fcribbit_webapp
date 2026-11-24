@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="send">Enviar</string>
+    <string name="settings">Ajustes</string>
+    <string name="clear_messages">Borrar mensajes</string>
+    <string name="clear_messages_confirm">¿Borrar todos los mensajes?</string>
+    <string name="yes">Sí</string>
+    <string name="no">No</string>
+    <string name="messages_cleared">Mensajes borrados</string>
+    <string name="hint_message">Mensaje</string>
+    <string name="listening">Escuchando</string>
+    <string name="transmitting">Transmitiendo…</string>
+    <string name="encrypting">Cifrando…</string>
+    <string name="mic_error">Micrófono no disponible</string>
+    <string name="bad_frame">Se recibió una trama dañada</string>
+    <string name="bytes_left">Quedan %1$d bytes</string>
+    <string name="enc_bytes_left">Quedan %1$d bytes (cifrado)</string>
+    <string name="too_long">Mensaje demasiado largo. Como máximo %1$d bytes con tu nombre/indicativo/grilla/teléfono actuales.</string>
+    <string name="enc_too_long">Los mensajes cifrados pueden tener como máximo %1$d caracteres con tu nombre/indicativo/grilla/teléfono actuales. Acortalo, por favor.</string>
+    <string name="set_password">Poné una contraseña de cifrado en Ajustes o desactivá el cifrado.</string>
+    <string name="encryption_failed">Falló el cifrado, el mensaje no se envió.</string>
+    <string name="enc_no_password">Mensaje cifrado (poné la contraseña en Ajustes para leerlo)</string>
+    <string name="enc_wrong_password">Mensaje cifrado (contraseña incorrecta o dañado)</string>
+    <string name="unknown">desconocido</string>
+    <string name="native_error">No se pudo cargar la librería del módem en este equipo.</string>
+    <string name="me">Yo</string>
+
+    <string name="cat_station">Estación</string>
+    <string name="name">Nombre</string>
+    <string name="callsign">Indicativo</string>
+    <string name="gridsquare">Grilla (locator)</string>
+    <string name="phone">Teléfono</string>
+    <string name="gps_grid">Obtener grilla por GPS</string>
+    <string name="gps_grid_summary">Usa la ubicación actual para completar la grilla</string>
+    <string name="gps_waiting">Esperando ubicación…</string>
+    <string name="gps_off">La ubicación está desactivada. Activá el GPS o las redes inalámbricas.</string>
+    <string name="gps_timeout">No se pudo obtener la ubicación.</string>
+    <string name="cat_chat">Chat</string>
+    <string name="save_messages">Guardar mensajes</string>
+    <string name="save_messages_summary">Conservar el historial en el teléfono</string>
+    <string name="hide_senders">Ocultar remitente y hora</string>
+    <string name="hide_senders_summary">No mostrar la línea de nombre/hora sobre cada mensaje</string>
+    <string name="cat_audio">Audio</string>
+    <string name="tx_level">Nivel de transmisión</string>
+    <string name="mic_source">Entrada de micrófono</string>
+    <string name="cat_encryption">Cifrado (experimental)</string>
+    <string name="encryption_enabled">Cifrar mensajes</string>
+    <string name="encryption_summary">AES-256-GCM, compatible con la web app de Ribbit. Cifrar en frecuencias de radioaficionados suele estar prohibido (UIT RR art. 25, FCC 97.113). Usalo solo fuera de las bandas de aficionados.</string>
+    <string name="encryption_password">Contraseña de cifrado</string>
+    <string name="password_set">Contraseña configurada</string>
+    <string name="password_not_set">Sin contraseña</string>
+    <string name="not_set">Sin configurar</string>
+</resources>

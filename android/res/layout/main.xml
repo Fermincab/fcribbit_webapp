@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="fill_parent"
+    android:layout_height="fill_parent"
+    android:orientation="vertical"
+    android:background="@color/bg">
+
+    <!-- title bar, like the web app's -->
+    <LinearLayout
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="@color/dark_green"
+        android:paddingLeft="6dip">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/app_name"
+            android:textStyle="bold"
+            android:textSize="16sp"
+            android:textColor="#FFFFFF" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/version"
+            android:textStyle="italic"
+            android:textSize="11sp"
+            android:textColor="#CCFFFFFF"
+            android:paddingLeft="4dip" />
+
+        <TextView
+            android:id="@+id/status"
+            android:layout_width="0dip"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="right"
+            android:singleLine="true"
+            android:ellipsize="end"
+            android:textSize="12sp"
+            android:textColor="#FFFFFF"
+            android:paddingLeft="6dip"
+            android:paddingRight="4dip" />
+
+        <ImageButton
+            android:id="@+id/settings_button"
+            android:layout_width="40dip"
+            android:layout_height="34dip"
+            android:src="@android:drawable/ic_menu_preferences"
+            android:scaleType="centerInside"
+            android:background="@android:color/transparent"
+            android:contentDescription="@string/settings" />
+    </LinearLayout>
+
+    <!-- input level meter -->
+    <ProgressBar
+        android:id="@+id/level"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="fill_parent"
+        android:layout_height="4dip"
+        android:max="100"
+        android:progress="0" />
+
+    <ListView
+        android:id="@+id/chat"
+        android:layout_width="fill_parent"
+        android:layout_height="0dip"
+        android:layout_weight="1"
+        android:divider="@null"
+        android:dividerHeight="0dip"
+        android:cacheColorHint="@color/bg"
+        android:stackFromBottom="true"
+        android:transcriptMode="normal"
+        android:paddingLeft="4dip"
+        android:paddingRight="4dip" />
+
+    <TextView
+        android:id="@+id/counter"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:gravity="right"
+        android:textSize="10sp"
+        android:textColor="@color/meta"
+        android:paddingRight="6dip" />
+
+    <LinearLayout
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="2dip">
+
+        <EditText
+            android:id="@+id/message"
+            android:layout_width="0dip"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:hint="@string/hint_message"
+            android:inputType="text|textCapSentences"
+            android:imeOptions="actionSend"
+            android:maxLines="3"
+            android:textSize="14sp" />
+
+        <Button
+            android:id="@+id/send"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/send" />
+    </LinearLayout>
+</LinearLayout>

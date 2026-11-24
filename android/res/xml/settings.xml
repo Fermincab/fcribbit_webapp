@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Keys match the web app's localStorage keys where there is one. -->
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <PreferenceCategory android:title="@string/cat_station">
+        <EditTextPreference
+            android:key="name"
+            android:title="@string/name"
+            android:singleLine="true"
+            android:inputType="textPersonName|textCapWords" />
+        <EditTextPreference
+            android:key="callsign"
+            android:title="@string/callsign"
+            android:singleLine="true"
+            android:inputType="textCapCharacters|textNoSuggestions" />
+        <EditTextPreference
+            android:key="gridsquare"
+            android:title="@string/gridsquare"
+            android:singleLine="true"
+            android:inputType="textCapCharacters|textNoSuggestions" />
+        <Preference
+            android:key="gps"
+            android:title="@string/gps_grid"
+            android:summary="@string/gps_grid_summary" />
+        <EditTextPreference
+            android:key="phone"
+            android:title="@string/phone"
+            android:singleLine="true"
+            android:inputType="phone" />
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/cat_chat">
+        <CheckBoxPreference
+            android:key="saveMessages"
+            android:title="@string/save_messages"
+            android:summary="@string/save_messages_summary"
+            android:defaultValue="true" />
+        <CheckBoxPreference
+            android:key="hideSenders"
+            android:title="@string/hide_senders"
+            android:summary="@string/hide_senders_summary"
+            android:defaultValue="false" />
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/cat_audio">
+        <ListPreference
+            android:key="txLevel"
+            android:title="@string/tx_level"
+            android:entries="@array/tx_level_labels"
+            android:entryValues="@array/tx_level_values"
+            android:defaultValue="0.75" />
+        <ListPreference
+            android:key="micSource"
+            android:title="@string/mic_source"
+            android:entries="@array/mic_source_labels"
+            android:entryValues="@array/mic_source_values"
+            android:defaultValue="6" />
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/cat_encryption">
+        <CheckBoxPreference
+            android:key="encryptionEnabled"
+            android:title="@string/encryption_enabled"
+            android:summary="@string/encryption_summary"
+            android:defaultValue="false" />
+        <EditTextPreference
+            android:key="encryptionPassword"
+            android:title="@string/encryption_password"
+            android:singleLine="true"
+            android:password="true"
+            android:inputType="textPassword" />
+    </PreferenceCategory>
+</PreferenceScreen>
