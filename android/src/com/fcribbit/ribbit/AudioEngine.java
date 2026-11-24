@@ -44,6 +44,11 @@ public final class AudioEngine {
 	private Thread rxThread;
 	private int micSource = MediaRecorder.AudioSource.VOICE_RECOGNITION;
 	private final Object micLock = new Object();
+	private volatile int generation;
+	private volatile AudioRecord current;
+	private volatile long lastReadAt;
+	private volatile boolean reopenWanted;
+	private static final int DEAD_SILENCE_SAMPLES = RATE * 8; // 8 s of exact zeros: the input is dead
 
 	public AudioEngine(Listener listener) {
 		this.listener = listener;
@@ -69,11 +74,17 @@ public final class AudioEngine {
 		if (running)
 			return;
 		running = true;
+		spawnReceiver();
+		main.removeCallbacks(watchdog);
+		main.postDelayed(watchdog, 1000);
+	}
+
+	private synchronized void spawnReceiver() {
+		final int gen = ++generation;
+		lastReadAt = System.currentTimeMillis();
 		rxThread = new Thread(new Runnable() {
 			public void run() {
-				synchronized (micLock) {
-					receiveLoop();
-				}
+				receiveLoop(gen);
 			}
 		}, "ribbit-rx");
 		rxThread.start();
@@ -81,6 +92,15 @@ public final class AudioEngine {
 
 	public synchronized void stopListening() {
 		running = false;
+		main.removeCallbacks(watchdog);
+		AudioRecord r = current;
+		if (r != null) {
+			try {
+				r.stop(); // unblocks a read() that hangs
+			} catch (Exception e) {
+				// ignore
+			}
+		}
 		if (rxThread != null) {
 			try {
 				rxThread.join(1500);
@@ -90,6 +110,41 @@ public final class AudioEngine {
 			rxThread = null;
 		}
 	}
+
+	/**
+	 * Close and reopen the microphone. Used after the alarm, whose speakerphone
+	 * switching can leave an open AudioRecord delivering nothing.
+	 */
+	public void reopen() {
+		reopenWanted = true;
+		AudioRecord r = current;
+		if (r != null) {
+			try {
+				r.stop();
+			} catch (Exception e) {
+				// ignore
+			}
+		}
+	}
+
+	/** restarts reception when the microphone stops delivering samples */
+	private final Runnable watchdog = new Runnable() {
+		public void run() {
+			if (!running)
+				return;
+			long stale = System.currentTimeMillis() - lastReadAt;
+			if (stale > 6000) {
+				// the reading thread is stuck for good: leave it behind and start a new one
+				synchronized (AudioEngine.this) {
+					if (running)
+						spawnReceiver();
+				}
+			} else if (stale > 3000) {
+				reopen();
+			}
+			main.postDelayed(this, 1000);
+		}
+	};
 
 	private AudioRecord openRecorder() {
 		int minBuf = AudioRecord.getMinBufferSize(RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT);
@@ -122,71 +177,97 @@ public final class AudioEngine {
 		});
 	}
 
-	private void receiveLoop() {
+	private void receiveLoop(int gen) {
 		Process.setThreadPriority(Process.THREAD_PRIORITY_URGENT_AUDIO);
-		AudioRecord rec = openRecorder();
-		if (rec == null) {
-			running = false;
-			postRxError();
-			return;
-		}
 		short[] pcm = new short[READ_SAMPLES];
 		byte[] payload = new byte[Modem.PAYLOAD_BYTES];
 		WakeTone.Detector detector = new WakeTone.Detector();
 		long lastLevel = 0, lastTone = 0;
-		try {
-			rec.startRecording();
-			while (running) {
-				int n = rec.read(pcm, 0, pcm.length);
-				if (n <= 0) {
-					try {
-						Thread.sleep(20);
-					} catch (InterruptedException e) {
-						// ignore
-					}
-					continue;
-				}
-				if (muted) {
-					for (int i = 0; i < n; ++i)
-						pcm[i] = 0;
-				}
-				long now = System.currentTimeMillis();
-				if (detector.process(pcm, 0, n) && now - lastTone > 2000) {
-					lastTone = now;
-					main.post(new Runnable() {
-						public void run() {
-							listener.onWakeTone();
-						}
-					});
-				}
-				final int result = Modem.decoderFeed(pcm, n, payload);
-				if (result != Modem.NOTHING) {
-					final byte[] copy = payload.clone();
-					main.post(new Runnable() {
-						public void run() {
-							listener.onPayload(copy, result);
-						}
-					});
-				}
-				if (levelWanted && now - lastLevel > 120) {
-					lastLevel = now;
-					final int level = levelPercent(pcm, n);
-					main.post(new Runnable() {
-						public void run() {
-							listener.onLevel(level);
-						}
-					});
-				}
+		int openFailures = 0;
+		while (running && gen == generation) {
+			AudioRecord rec = openRecorder();
+			if (rec == null) {
+				if (++openFailures == 10)
+					postRxError();
+				sleep(500);
+				continue;
 			}
-		} catch (Exception e) {
-			postRxError();
-		} finally {
+			openFailures = 0;
+			reopenWanted = false;
+			current = rec;
+			int errors = 0, zeros = 0;
 			try {
-				rec.stop();
+				rec.startRecording();
+				while (running && gen == generation && !reopenWanted) {
+					int n = rec.read(pcm, 0, pcm.length);
+					lastReadAt = System.currentTimeMillis();
+					if (n <= 0) {
+						if (++errors > 10)
+							break; // reopen
+						sleep(20);
+						continue;
+					}
+					errors = 0;
+					// a live input always has some noise; long exact silence means a dead route
+					boolean allZero = true;
+					for (int i = 0; i < n && allZero; ++i)
+						allZero = pcm[i] == 0;
+					zeros = allZero && !transmitting ? zeros + n : 0;
+					if (zeros > DEAD_SILENCE_SAMPLES)
+						break; // reopen
+					if (muted) {
+						for (int i = 0; i < n; ++i)
+							pcm[i] = 0;
+					}
+					long now = lastReadAt;
+					if (detector.process(pcm, 0, n) && now - lastTone > 2000) {
+						lastTone = now;
+						main.post(new Runnable() {
+							public void run() {
+								listener.onWakeTone();
+							}
+						});
+					}
+					final int result = Modem.decoderFeed(pcm, n, payload);
+					if (result != Modem.NOTHING) {
+						final byte[] copy = payload.clone();
+						main.post(new Runnable() {
+							public void run() {
+								listener.onPayload(copy, result);
+							}
+						});
+					}
+					if (levelWanted && now - lastLevel > 120) {
+						lastLevel = now;
+						final int level = levelPercent(pcm, n);
+						main.post(new Runnable() {
+							public void run() {
+								listener.onLevel(level);
+							}
+						});
+					}
+				}
 			} catch (Exception e) {
-				// ignore
+				// reopen below
+			} finally {
+				current = null;
+				try {
+					rec.stop();
+				} catch (Exception e) {
+					// ignore
+				}
+				rec.release();
 			}
-			rec.release();
+			if (running && gen == generation)
+				sleep(200);
+		}
+	}
+
+	private static void sleep(long ms) {
+		try {
+			Thread.sleep(ms);
+		} catch (InterruptedException e) {
+			// ignore
 		}
 	}
 

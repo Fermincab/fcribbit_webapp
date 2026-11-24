@@ -58,6 +58,7 @@ public class AlarmActivity extends Activity {
 		registerReceiver(screenOff, new IntentFilter(Intent.ACTION_SCREEN_OFF));
 		player = new AlarmPlayer(this);
 		player.start();
+		routeChanged();
 		handler.postDelayed(new Runnable() {
 			public void run() {
 				done();
@@ -95,9 +96,15 @@ public class AlarmActivity extends Activity {
 		}
 		handler.removeCallbacksAndMessages(null);
 		player.stop();
+		routeChanged();
 		if (screenLock.isHeld())
 			screenLock.release();
 		finish();
+	}
+
+	/** turning the speakerphone on/off can break the open microphone: let the service reopen it */
+	private void routeChanged() {
+		startService(new Intent(this, RibbitService.class).setAction(RibbitService.ACTION_AUDIO_ROUTE));
 	}
 
 	@Override

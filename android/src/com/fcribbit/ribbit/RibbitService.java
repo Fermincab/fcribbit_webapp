@@ -36,6 +36,8 @@ import java.util.concurrent.Executors;
 public class RibbitService extends Service implements AudioEngine.Listener, SessionLogic.Actions {
 	public static final String ACTION_START = "com.fcribbit.ribbit.START";
 	public static final String ACTION_CHECK = "com.fcribbit.ribbit.CHECK";
+	/** the alarm switched the speakerphone on or off: the microphone route may have changed */
+	public static final String ACTION_AUDIO_ROUTE = "com.fcribbit.ribbit.AUDIO_ROUTE";
 
 	public static final String MODE_INTERMITTENT = "intermittent";
 	public static final String MODE_CONTINUOUS = "continuous";
@@ -121,6 +123,14 @@ public class RibbitService extends Service implements AudioEngine.Listener, Sess
 			wakeLock.acquire();
 			WakeReceiver.releaseLock();
 			runCheck();
+		} else if (ACTION_AUDIO_ROUTE.equals(action)) {
+			handler.postDelayed(new Runnable() {
+				public void run() {
+					if (engine.isListening())
+						engine.reopen();
+					update();
+				}
+			}, 500);
 		} else {
 			update();
 		}
